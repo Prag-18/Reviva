@@ -20,12 +20,14 @@ class User(Base):
     password = Column(String, nullable=False)
 
     role = Column(String, nullable=False)  # donor / seeker
-    blood_group = Column(String, nullable=False)
+    blood_group = Column(String, nullable=True)  # nullable for organ-only donors
+
+    donation_type = Column(String, nullable=False)  
+    # blood / kidney / liver / heart / cornea / bone_marrow
 
     verified = Column(Boolean, default=False)
-    available = Column(Boolean, default=True)  # donor availability toggle
+    available = Column(Boolean, default=True)
 
-    # PostGIS geography type for real distance calculations
     location = Column(Geography(geometry_type="POINT", srid=4326))
 
     # Relationships
@@ -65,8 +67,11 @@ class DonationRequest(Base):
         nullable=False
     )
 
-    urgency = Column(String, default="medium")  # low / medium / high / critical
-    status = Column(String, default="pending")  # pending / accepted / rejected
+    organ_type = Column(String, nullable=False)
+    # blood / kidney / liver / etc.
+
+    urgency = Column(String, default="medium")
+    status = Column(String, default="pending")
 
     # Relationships
     donor = relationship(

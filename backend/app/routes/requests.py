@@ -25,11 +25,15 @@ async def _notify_donor_new_request(app_request: Request, donor_id: uuid.UUID) -
 async def create_request(
     donor_id: uuid.UUID,
     urgency: str,
+    organ_type: str,
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+
     urgency_normalized = urgency.lower().strip()
+    organ_type_normalized = organ_type.lower().strip()
+
     if urgency_normalized not in ALLOWED_URGENCY_LEVELS:
         raise HTTPException(status_code=400, detail="Invalid urgency level")
 
@@ -39,6 +43,7 @@ async def create_request(
     if current_user.id == donor_id:
         raise HTTPException(status_code=400, detail="Cannot create a request to yourself")
 
+    # ✅ Fetch donor FIRST
     donor = (
         db.query(models.User)
         .filter(models.User.id == donor_id, models.User.role == "donor")
@@ -50,6 +55,13 @@ async def create_request(
 
     if not donor.available:
         raise HTTPException(status_code=400, detail="Donor is currently unavailable")
+
+    # ✅ Organ validation AFTER donor fetch
+    if donor.donation_type != organ_type_normalized:
+        raise HTTPException(
+            status_code=400,
+            detail="Donor does not support this organ type"
+        )
 
     existing_pending_request = (
         db.query(models.DonationRequest)
@@ -71,6 +83,7 @@ async def create_request(
         donor_id=donor_id,
         seeker_id=current_user.id,
         urgency=urgency_normalized,
+        organ_type=organ_type_normalized,
         status=PENDING_STATUS,
     )
 
@@ -83,6 +96,7 @@ async def create_request(
     return {
         "message": "Request sent successfully",
         "urgency": urgency_normalized,
+        "organ_type": organ_type_normalized,
         "request_id": new_request.id,
     }
 
@@ -177,6 +191,7 @@ def get_my_requests(
             "id": request_item.id,
             "urgency": request_item.urgency,
             "status": request_item.status,
+            "organ_type": request_item.organ_type,
             "donor_id": request_item.donor_id,
             "seeker_id": request_item.seeker_id,
             "seeker_name": request_item.seeker.name,

@@ -1,113 +1,154 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
-function Register() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "",
-    blood_group: "",
-    latitude: "",
-    longitude: ""
-  });
+export default function Register() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("donor");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [donationType, setDonationType] = useState("blood");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
-  const navigate = useNavigate();
+  const handleRegister = async (e) => {
+    e.preventDefault();
 
-  const handleRegister = async () => {
     try {
       await API.post("/register", null, {
-        params: form   // 🔥 IMPORTANT (backend expects query params)
+        params: {
+          name,
+          email,
+          password,
+          role,
+          blood_group: bloodGroup,
+          donation_type: donationType,   // ✅ THIS IS WHERE IT GOES
+          latitude,
+          longitude
+        }
       });
 
-      alert("User registered successfully!");
-      navigate("/");  // Redirect to login after register
-    } catch (error) {
-      console.error(error);
-      alert("Registration failed");
+      alert("Registered successfully!");
+    } catch (err) {
+      alert(err.response?.data?.detail || "Registration failed");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="card w-[700px]">
+    <div className="min-h-screen flex items-center justify-center px-6">
 
-        <h1 className="text-3xl font-bold text-center text-rose-600 mb-6">
-          Register
+      <div className="bg-white/90 backdrop-blur-lg shadow-2xl rounded-3xl p-10 w-full max-w-3xl border border-rose-100">
+
+        <h1 className="text-3xl font-bold text-center text-rose-600 mb-8">
+          Create Your Account ❤️
         </h1>
 
-        <div className="grid grid-cols-2 gap-4">
+        <form
+          onSubmit={handleRegister}
+          className="grid md:grid-cols-2 gap-6"
+        >
 
+          {/* Name */}
           <input
-            className="form-input"
+            type="text"
             placeholder="Full Name"
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-
-          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="form-input"
-            placeholder="Email"
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
           />
 
+          {/* Email */}
+          <input
+            type="email"
+            placeholder="Email Address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="form-input"
+            required
+          />
+
+          {/* Password */}
           <input
             type="password"
-            className="form-input"
             placeholder="Password"
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="form-input"
+            required
           />
 
+          {/* Role */}
           <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
             className="form-input"
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
-            <option value="">Select Role</option>
             <option value="donor">Donor</option>
             <option value="seeker">Seeker</option>
           </select>
 
+          {/* Donation Type */}
           <select
+            value={donationType}
+            onChange={(e) => setDonationType(e.target.value)}
             className="form-input"
-            onChange={(e) => setForm({ ...form, blood_group: e.target.value })}
           >
-            <option value="">Blood Group</option>
-            <option>A+</option>
-            <option>A-</option>
-            <option>B+</option>
-            <option>B-</option>
-            <option>O+</option>
-            <option>O-</option>
-            <option>AB+</option>
-            <option>AB-</option>
+            <option value="blood">Blood</option>
+            <option value="kidney">Kidney</option>
+            <option value="liver">Liver</option>
+            <option value="heart">Heart</option>
+            <option value="cornea">Cornea</option>
+            <option value="bone_marrow">Bone Marrow</option>
           </select>
 
+          {/* Blood Group (Only if blood selected) */}
+          {donationType === "blood" && (
+            <input
+              type="text"
+              placeholder="Blood Group (e.g., A+)"
+              value={bloodGroup}
+              onChange={(e) => setBloodGroup(e.target.value)}
+              className="form-input"
+              required
+            />
+          )}
+
+          {/* Latitude */}
           <input
-            className="form-input"
+            type="number"
             placeholder="Latitude"
-            type="number"
-            onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-          />
-
-          <input
+            value={latitude}
+            onChange={(e) => setLatitude(e.target.value)}
             className="form-input"
-            placeholder="Longitude"
-            type="number"
-            onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+            required
           />
 
-        </div>
+          {/* Longitude */}
+          <input
+            type="number"
+            placeholder="Longitude"
+            value={longitude}
+            onChange={(e) => setLongitude(e.target.value)}
+            className="form-input"
+            required
+          />
 
-        <button
-          onClick={handleRegister}
-          className="primary-btn w-full mt-8"
-        >
-          Register
-        </button>
+          {/* Submit Button */}
+          <div className="md:col-span-2 mt-4">
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-red-500 hover:to-rose-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              Register Now
+            </button>
+          </div>
+
+        </form>
 
       </div>
+
     </div>
   );
-}
 
-export default Register;
+}

@@ -1,245 +1,243 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import NearbyDonors from "./NearbyDonors";
-import Navbar from "../components/Navbar";
-import { useNavigate } from "react-router-dom";
 
-function Dashboard() {
+export default function Dashboard() {
     const [user, setUser] = useState(null);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
 
-    const fetchData = async () => {
+    const [notification, setNotification] = useState("");
+
+    // ================= FETCH USER =================
+    const fetchUser = async () => {
         try {
-            const userRes = await API.get("/me");
-            setUser(userRes.data);
-
-            const reqRes = await API.get(`/my-requests/${userRes.data.id}`);
-            setRequests(reqRes.data);
+            const res = await API.get("/me");
+            setUser(res.data);
         } catch (err) {
-            console.error("Error fetching data", err);
-            localStorage.removeItem("token");
-            navigate("/");
+            console.error("Error fetching user", err);
+        }
+    };
+
+    // ================= FETCH REQUESTS =================
+    const fetchRequests = async (userId) => {
+        try {
+            const res = await API.get(`/my-requests/${userId}`);
+            setRequests(res.data);
+        } catch (err) {
+            console.error("Error fetching requests", err);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    // ================= TOGGLE AVAILABILITY =================
+    const toggleAvailability = async () => {
+        try {
+            const res = await API.put("/toggle-availability");
+            setUser({ ...user, available: res.data.available });
+        } catch (err) {
+            console.error("Error toggling availability", err);
+        }
+    };
 
+    // ================= ACCEPT REQUEST =================
+    const acceptRequest = async (id) => {
+        try {
+            await API.put(`/accept-request/${id}`);
+            fetchRequests(user.id);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Error accepting request");
+        }
+    };
+
+    // ================= REJECT REQUEST =================
+    const rejectRequest = async (id) => {
+        try {
+            await API.put(`/reject-request/${id}`);
+            fetchRequests(user.id);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Error rejecting request");
+        }
+    };
+
+    // ================= WEBSOCKET =================
     useEffect(() => {
         if (!user) return;
 
-        const apiBaseUrl = API.defaults.baseURL || "http://127.0.0.1:8000";
-        const wsBaseUrl = apiBaseUrl.replace(/^http/i, "ws");
-        const socket = new WebSocket(`${wsBaseUrl}/ws/${user.id}`);
+        const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${user.id}`);
 
-        socket.onopen = () => {
-            console.log("WebSocket connected");
-        };
-
-        socket.onmessage = (event) => {
+        ws.onmessage = (event) => {
             if (event.data === "new_request") {
-                fetchData();
+                setNotification("🔔 New donation request received!");
+                fetchRequests(user.id);
+                setTimeout(() => setNotification(""), 4000);
             }
         };
 
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
+        return () => ws.close();
+    }, [user]);
+
+    // ================= INITIAL LOAD =================
+    useEffect(() => {
+        const loadData = async () => {
+            await fetchUser();
         };
+        loadData();
+    }, []);
 
-        socket.onclose = (event) => {
-            console.warn("WebSocket closed:", event.code, event.reason || "No reason provided");
-        };
+    useEffect(() => {
+        if (user) {
+            fetchRequests(user.id);
+        }
+    }, [user]);
 
-        return () => {
-            socket.close();
-        };
-    }, [user?.id]);
+    if (loading || !user) {
+        return <div className="p-10 text-center">Loading...</div>;
+    }
 
+    // ================= CALCULATE STATS =================
+    const total = requests.length;
+    const pending = requests.filter((r) => r.status === "pending").length;
+    const accepted = requests.filter((r) => r.status === "accepted").length;
 
-
-
-    const toggleAvailability = async () => {
-        await API.put("/toggle-availability");
-        fetchData();
+    const urgencyColors = {
+        low: "text-blue-500",
+        medium: "text-yellow-500",
+        high: "text-orange-500",
+        critical: "text-red-600 font-bold",
     };
 
-    const acceptRequest = async (id) => {
-        await API.put(`/accept-request/${id}`);
-        fetchData();
-    };
-
-    const rejectRequest = async (id) => {
-        await API.put(`/reject-request/${id}`);
-        fetchData();
-    };
-
-    if (loading) return <div className="p-10">Loading...</div>;
-    if (!user) return null;
-
-    const pendingCount = requests.filter(
-        r => r.status === "pending"
-    ).length;
-
-    const acceptedCount = requests.filter(
-        r => r.status === "accepted"
-    ).length;
-
-    const pendingRequests = requests.filter(
-        r => r.status === "pending" && r.donor_id === user.id
-    );
-
-    const urgencyColor = {
-        low: "bg-green-100 text-green-600",
-        medium: "bg-yellow-100 text-yellow-600",
-        high: "bg-orange-100 text-orange-600",
-        critical: "bg-red-100 text-red-600"
+    const statusColors = {
+        pending: "bg-yellow-100 text-yellow-700",
+        accepted: "bg-green-100 text-green-700",
+        rejected: "bg-red-100 text-red-700",
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-red-100">
+        <div className="p-8 space-y-8">
 
-            {/* 🔔 Navbar */}
-            <Navbar user={user} pendingRequests={pendingRequests} />
+            {/* Notification */}
+            {notification && (
+                <div className="bg-rose-500 text-white px-6 py-3 rounded-xl shadow-lg">
+                    {notification}
+                </div>
+            )}
 
-            <div className="p-10">
+            {/* Welcome Section */}
+            <div>
+                <h1 className="text-3xl font-bold text-rose-600">
+                    Welcome, {user.name} 👋
+                </h1>
+                <p className="text-gray-600">
+                    Role: {user.role} | Blood Group: {user.blood_group}
+                </p>
+            </div>
 
-                {/* Header */}
-                <div className="mb-10">
-                    <h1 className="text-4xl font-bold text-rose-600">
-                        Welcome, {user.name} 👋
-                    </h1>
-                    <p className="text-gray-600 mt-2">
-                        Role: <span className="font-semibold">{user.role}</span>
-                    </p>
+            {/* Stats Cards */}
+            <div className="grid md:grid-cols-3 gap-6">
+                <div className="card text-center">
+                    <p>Total Requests</p>
+                    <h2 className="text-3xl font-bold text-rose-600">{total}</h2>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-6 mb-10">
-
-                    <div className="card text-center">
-                        <h3 className="text-gray-500">Total Requests</h3>
-                        <p className="text-3xl font-bold text-rose-600 mt-2">
-                            {requests.length}
-                        </p>
-                    </div>
-
-                    <div className="card text-center">
-                        <h3 className="text-gray-500">Pending</h3>
-                        <p className="text-3xl font-bold text-yellow-500 mt-2">
-                            {pendingCount}
-                        </p>
-                    </div>
-
-                    <div className="card text-center">
-                        <h3 className="text-gray-500">Accepted</h3>
-                        <p className="text-3xl font-bold text-green-600 mt-2">
-                            {acceptedCount}
-                        </p>
-                    </div>
-
+                <div className="card text-center">
+                    <p>Pending</p>
+                    <h2 className="text-3xl font-bold text-yellow-500">{pending}</h2>
                 </div>
 
-                {/* ================= DONOR VIEW ================= */}
-                {user.role === "donor" && (
-                    <div>
+                <div className="card text-center">
+                    <p>Accepted</p>
+                    <h2 className="text-3xl font-bold text-green-600">{accepted}</h2>
+                </div>
+            </div>
 
-                        <div className="mb-6">
-                            <button
-                                onClick={toggleAvailability}
-                                className="primary-btn"
-                            >
-                                {user.available ? "Set Unavailable" : "Set Available"}
-                            </button>
-                        </div>
+            {/* Donor Availability Toggle */}
+            {user.role === "donor" && (
+                <button
+                    onClick={toggleAvailability}
+                    className={`primary-btn ${user.available
+                        ? "bg-green-500 hover:bg-green-600"
+                        : "bg-red-500 hover:bg-red-600"
+                        }`}
+                >
+                    {user.available ? "Set Unavailable" : "Set Available"}
+                </button>
+            )}
 
-                        <h2
-                            id="pending-section"
-                            className="text-2xl font-semibold mb-6"
-                        >
-                            Received Requests
-                        </h2>
+            {/* Seeker Nearby Donors */}
+            {user.role === "seeker" && <NearbyDonors />}
 
-                        <div className="grid gap-6">
-                            {requests
-                                .filter(r => r.donor_id === user.id)
-                                .map(r => (
-                                    <div key={r.id} className="card">
+            {/* Requests Section */}
+            <div>
+                <h2 className="text-2xl font-semibold mb-4">
+                    {user.role === "donor"
+                        ? "Received Requests"
+                        : "Sent Requests"}
+                </h2>
 
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h3 className="font-semibold text-lg">
-                                                Seeker: {r.seeker_name || "Unknown"}
-                                            </h3>
+                <div className="space-y-6">
+                    {requests.length === 0 && (
+                        <p className="text-gray-500">No requests yet.</p>
+                    )}
 
-                                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${urgencyColor[r.urgency]}`}>
-                                                {r.urgency}
-                                            </span>
-                                        </div>
+                    {requests.map((req) => (
+                        <div key={req.id} className="card">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-lg font-semibold">
+                                        {user.role === "donor"
+                                            ? req.seeker_name
+                                            : req.donor_name}
+                                    </h3>
 
-                                        <p className="text-gray-600 mb-2">
-                                            Status: <span className="font-semibold">{r.status}</span>
+                                    {req.organ_type === "blood" && (
+                                        <p className="text-sm text-gray-500">
+                                            Blood Group: {req.seeker_blood_group}
                                         </p>
+                                    )}
 
-                                        {r.status === "pending" && (
-                                            <div className="flex gap-4 mt-4">
-                                                <button
-                                                    onClick={() => acceptRequest(r.id)}
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
-                                                >
-                                                    Accept
-                                                </button>
+                                    <p className="text-sm text-gray-600 font-medium mt-1">
+                                        Organ: {req.organ_type?.toUpperCase()}
+                                    </p>
 
-                                                <button
-                                                    onClick={() => rejectRequest(r.id)}
-                                                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        )}
 
+                                    <p className={`mt-2 ${urgencyColors[req.urgency]}`}>
+                                        Urgency: {req.urgency.toUpperCase()}
+                                    </p>
+                                </div>
+
+                                <span
+                                    className={`px-3 py-1 rounded-full text-sm font-semibold ${statusColors[req.status]
+                                        }`}
+                                >
+                                    {req.status.toUpperCase()}
+                                </span>
+                            </div>
+
+                            {/* Accept / Reject Buttons */}
+                            {user.role === "donor" &&
+                                req.status === "pending" && (
+                                    <div className="flex gap-4 mt-4">
+                                        <button
+                                            onClick={() => acceptRequest(req.id)}
+                                            className="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600"
+                                        >
+                                            Accept
+                                        </button>
+
+                                        <button
+                                            onClick={() => rejectRequest(req.id)}
+                                            className="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600"
+                                        >
+                                            Reject
+                                        </button>
                                     </div>
-                                ))}
+                                )}
                         </div>
-
-                    </div>
-                )}
-
-                {/* ================= SEEKER VIEW ================= */}
-                {user.role === "seeker" && (
-                    <div>
-
-                        <h2 className="text-2xl font-semibold mb-6">
-                            Find Nearby Donors
-                        </h2>
-
-                        <NearbyDonors />
-
-                        <h2 className="text-2xl font-semibold mt-10 mb-6">
-                            Sent Requests
-                        </h2>
-
-                        <div className="grid gap-6">
-                            {requests
-                                .filter(r => r.seeker_id === user.id)
-                                .map(r => (
-                                    <div key={r.id} className="card">
-                                        <p>Urgency: {r.urgency}</p>
-                                        <p>Status: {r.status}</p>
-                                    </div>
-                                ))}
-                        </div>
-
-                    </div>
-                )}
-
+                    ))}
+                </div>
             </div>
         </div>
     );
 }
-
-export default Dashboard;

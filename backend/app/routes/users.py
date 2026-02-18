@@ -50,19 +50,32 @@ async def login(
 
 
 # ================= REGISTER =================
+ 
+ALLOWED_DONATION_TYPES = {
+    "blood", "kidney", "liver", "heart",
+    "cornea", "bone_marrow"
+}
+
 @router.post("/register")
 def register_user(
     name: str,
     email: str,
     password: str,
     role: str,
-    blood_group: str,
-    latitude: float,
-    longitude: float,
+    donation_type: str,   # ✅ NEW
+    blood_group: str = None,  # nullable
+    latitude: float = None,
+    longitude: float = None,
     db: Session = Depends(get_db)
 ):
 
-    # Prevent duplicate emails
+    if donation_type.lower() not in ALLOWED_DONATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid donation type")
+
+    if role == "donor" and not donation_type:
+        raise HTTPException(status_code=400, detail="Donation type required")
+
+    # Prevent duplicate email
     existing_user = db.query(models.User).filter(
         models.User.email == email
     ).first()
@@ -72,7 +85,9 @@ def register_user(
 
     hashed_pw = pwd_context.hash(password)
 
-    location_point = from_shape(Point(longitude, latitude), srid=4326)
+    location_point = None
+    if latitude and longitude:
+        location_point = from_shape(Point(longitude, latitude), srid=4326)
 
     user = models.User(
         name=name,
@@ -80,8 +95,9 @@ def register_user(
         password=hashed_pw,
         role=role,
         blood_group=blood_group,
+        donation_type=donation_type.lower(),
         location=location_point,
-        available=True  # default available
+        available=True
     )
 
     db.add(user)
@@ -90,6 +106,8 @@ def register_user(
 
     return {"message": "User registered successfully"}
 
+
+     
 
 # ================= TOGGLE AVAILABILITY =================
 @router.put("/toggle-availability")
