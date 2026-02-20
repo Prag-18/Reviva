@@ -5,6 +5,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Requests from "./pages/Requests";
 import API from "./services/api";
+import Profile from "./components/Profile";
+import DonationHistory from "./components/DonationHistory";
+
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -43,7 +46,8 @@ function App() {
           </PrivateRoute>
         }
       />
-
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/history" element={<DonationHistory />} />
       <Route
         path="/requests"
         element={

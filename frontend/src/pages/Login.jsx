@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import API, { setAuthToken } from "../services/api";
 
 function Login() {
@@ -7,8 +7,11 @@ function Login() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
     try {
+      // ✅ Backend logic from first code (using params)
       const res = await API.post("/login", null, {
         params: { email, password }
       });
@@ -19,52 +22,81 @@ function Login() {
       setAuthToken(token);
 
       navigate("/dashboard");
+
     } catch (err) {
       alert("Invalid email or password");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="card w-[500px]">
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="max-w-6xl w-full grid md:grid-cols-2 gap-16 items-center">
 
-        <h1 className="text-3xl font-bold text-center text-rose-600 mb-6">
-          Login
-        </h1>
+        {/* LEFT SIDE - BRANDING */}
+        <div className="text-center md:text-left space-y-6">
+          <h1 className="text-5xl font-bold text-rose-600 leading-tight">
+            Welcome to <span className="text-red-500">Reviva</span> ❤️
+          </h1>
 
-        <div className="space-y-4">
-          <input
-            className="form-input w-full"
-            placeholder="Email"
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <p className="text-lg text-gray-600 max-w-md mx-auto md:mx-0">
+            Connecting donors and seekers through a secure, real-time
+            life-saving network.
+          </p>
 
-          <input
-            type="password"
-            className="form-input w-full"
-            placeholder="Password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="flex justify-center md:justify-start gap-4 mt-4">
+            <div className="bg-white shadow-md px-5 py-3 rounded-xl text-sm font-medium">
+              🩸 Blood Donation
+            </div>
+
+            <div className="bg-white shadow-md px-5 py-3 rounded-xl text-sm font-medium">
+              🫀 Organ Donation
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={handleLogin}
-          className="primary-btn w-full mt-6"
-        >
-          Login
-        </button>
+        {/* RIGHT SIDE - LOGIN CARD */}
+        <div className="bg-white p-10 rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-center text-rose-600 mb-6">
+            Login
+          </h2>
 
-        {/* 👇 Register Link */}
-        <p className="text-center text-gray-500 mt-6">
-          Don’t have an account?{" "}
-          <Link
-            to="/register"
-            className="text-rose-600 font-semibold hover:underline"
-          >
-            Register here
-          </Link>
-        </p>
+          <form onSubmit={handleLogin} className="space-y-5">
 
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="form-input w-full"
+              required
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="form-input w-full"
+              required
+            />
+
+            <button type="submit" className="primary-btn w-full">
+              Login
+            </button>
+
+          </form>
+
+          <p className="text-sm text-gray-500 text-center mt-6">
+            Don’t have an account?{" "}
+            <span
+              className="text-rose-600 font-semibold cursor-pointer hover:underline"
+              onClick={() => navigate("/register")}
+            >
+              Register here
+            </span>
+          </p>
+
+        </div>
       </div>
     </div>
   );

@@ -1,15 +1,17 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey
+from datetime import datetime
+
+from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geography
+
 from .database import Base
 
 
 # ==========================
 # USER MODEL
 # ==========================
-
 class User(Base):
     __tablename__ = "users"
 
@@ -19,15 +21,16 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
 
-    role = Column(String, nullable=False)  # donor / seeker
-    blood_group = Column(String, nullable=True)  # nullable for organ-only donors
+    role = Column(String, nullable=False)  # donor or seeker
 
-    donation_type = Column(String, nullable=False)  
-    # blood / kidney / liver / heart / cornea / bone_marrow
+    blood_group = Column(String)
+    donation_type = Column(String)  # blood, kidney, liver, etc.
 
+    phone = Column(String)
     verified = Column(Boolean, default=False)
     available = Column(Boolean, default=True)
 
+    # PostGIS location
     location = Column(Geography(geometry_type="POINT", srid=4326))
 
     # Relationships
@@ -49,7 +52,6 @@ class User(Base):
 # ==========================
 # DONATION REQUEST MODEL
 # ==========================
-
 class DonationRequest(Base):
     __tablename__ = "donation_requests"
 
@@ -68,12 +70,11 @@ class DonationRequest(Base):
     )
 
     organ_type = Column(String, nullable=False)
-    # blood / kidney / liver / etc.
-
     urgency = Column(String, default="medium")
     status = Column(String, default="pending")
 
-    # Relationships
+    created_at = Column(DateTime, default=datetime.utcnow)
+
     donor = relationship(
         "User",
         foreign_keys=[donor_id],

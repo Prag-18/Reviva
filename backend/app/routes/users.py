@@ -62,12 +62,14 @@ def register_user(
     email: str,
     password: str,
     role: str,
-    donation_type: str,   # ✅ NEW
-    blood_group: str = None,  # nullable
+    donation_type: str,
+    blood_group: str = None,
+    phone: str = None,   # ✅ ADD THIS
     latitude: float = None,
     longitude: float = None,
     db: Session = Depends(get_db)
 ):
+
 
     if donation_type.lower() not in ALLOWED_DONATION_TYPES:
         raise HTTPException(status_code=400, detail="Invalid donation type")
@@ -96,9 +98,11 @@ def register_user(
         role=role,
         blood_group=blood_group,
         donation_type=donation_type.lower(),
+        phone=phone,   # ✅ ADD THIS
         location=location_point,
         available=True
-    )
+    )  
+
 
     db.add(user)
     db.commit()
@@ -130,6 +134,65 @@ def get_me(current_user = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role,
         "blood_group": current_user.blood_group,
-        "available": current_user.available
+        "available": current_user.available,
+        "phone": current_user.phone   # 👈 ADD THIS
     }
+
+from pydantic import BaseModel
+
+class UpdateProfile(BaseModel):
+    phone: str | None = None
+    donation_type: str | None = None
+    available: bool | None = None
+    role: str | None = None
+
+
+@router.put("/users/me")
+def update_profile(
+    data: UpdateProfile,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if data.phone is not None:
+        current_user.phone = data.phone
+
+    if data.donation_type is not None:
+        current_user.donation_type = data.donation_type.lower()
+
+    if data.available is not None:
+        current_user.available = data.available
+
+    if data.role is not None:
+        if data.role not in ["donor", "seeker"]:
+            raise HTTPException(status_code=400, detail="Invalid role")
+        current_user.role = data.role
+
+    db.commit()
+    db.refresh(current_user)
+
+    return {"message": "Profile updated successfully"}
+@router.get("/donation-history")
+def get_donation_history(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role == "seeker":
+        history = db.query(models.DonationRequest).filter(
+            models.DonationRequest.seeker_id == current_user.id
+        ).all()
+    else:
+        history = db.query(models.DonationRequest).filter(
+            models.DonationRequest.donor_id == current_user.id
+        ).all()
+
+    return [
+        {
+            "id": req.id,
+            "organ_type": req.organ_type,
+            "status": req.status,
+            "created_at": req.created_at,
+        }
+        for req in history
+    ]
+
 

@@ -1,15 +1,46 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
 export default function Register() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("donor");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [donationType, setDonationType] = useState("blood");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const navigate = useNavigate();
+  const [location, setLocation] = useState({
+    latitude: null,
+    longitude: null,
+  });
+  const handleLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          alert("Location captured!");
+        },
+        () => {
+          alert("Unable to fetch location");
+        }
+      );
+    }
+  };
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "donor",
+    donation_type: "blood",
+    blood_group: "",
+    phone: "",
+  });
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -17,82 +48,84 @@ export default function Register() {
     try {
       await API.post("/register", null, {
         params: {
-          name,
-          email,
-          password,
-          role,
-          blood_group: bloodGroup,
-          donation_type: donationType,   // ✅ THIS IS WHERE IT GOES
-          latitude,
-          longitude
-        }
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          donation_type: formData.donation_type,
+          blood_group: formData.blood_group,
+          phone: formData.phone,
+          latitude: location.latitude,       
+          longitude: location.longitude,    
+        },
       });
 
-      alert("Registered successfully!");
-    } catch (err) {
-      alert(err.response?.data?.detail || "Registration failed");
+
+      alert("Registration successful!");
+      navigate("/");
+    } catch (error) {
+      alert(error.response?.data?.detail || "Registration failed");
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
 
-      <div className="bg-white/90 backdrop-blur-lg shadow-2xl rounded-3xl p-10 w-full max-w-3xl border border-rose-100">
+        <h2 className="text-2xl font-bold text-center text-rose-600 mb-6">
+          Register
+        </h2>
 
-        <h1 className="text-3xl font-bold text-center text-rose-600 mb-8">
-          Create Your Account ❤️
-        </h1>
+        <form onSubmit={handleRegister} className="space-y-4">
 
-        <form
-          onSubmit={handleRegister}
-          className="grid md:grid-cols-2 gap-6"
-        >
-
-          {/* Name */}
           <input
             type="text"
+            name="name"
             placeholder="Full Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="form-input"
+            className="form-input w-full"
+            onChange={handleChange}
             required
           />
 
-          {/* Email */}
           <input
             type="email"
-            placeholder="Email Address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="form-input"
+            name="email"
+            placeholder="Email"
+            className="form-input w-full"
+            onChange={handleChange}
             required
           />
 
-          {/* Password */}
           <input
             type="password"
+            name="password"
             placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="form-input"
+            className="form-input w-full"
+            onChange={handleChange}
             required
           />
 
-          {/* Role */}
+          <input
+            type="text"
+            name="phone"
+            placeholder="Phone Number"
+            className="form-input w-full"
+            onChange={handleChange}
+          />
+
           <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="form-input"
+            name="role"
+            className="form-input w-full"
+            onChange={handleChange}
           >
             <option value="donor">Donor</option>
             <option value="seeker">Seeker</option>
           </select>
 
-          {/* Donation Type */}
           <select
-            value={donationType}
-            onChange={(e) => setDonationType(e.target.value)}
-            className="form-input"
+            name="donation_type"
+            className="form-input w-full"
+            onChange={handleChange}
           >
             <option value="blood">Blood</option>
             <option value="kidney">Kidney</option>
@@ -102,53 +135,27 @@ export default function Register() {
             <option value="bone_marrow">Bone Marrow</option>
           </select>
 
-          {/* Blood Group (Only if blood selected) */}
-          {donationType === "blood" && (
-            <input
-              type="text"
-              placeholder="Blood Group (e.g., A+)"
-              value={bloodGroup}
-              onChange={(e) => setBloodGroup(e.target.value)}
-              className="form-input"
-              required
-            />
-          )}
-
-          {/* Latitude */}
           <input
-            type="number"
-            placeholder="Latitude"
-            value={latitude}
-            onChange={(e) => setLatitude(e.target.value)}
-            className="form-input"
-            required
+            type="text"
+            name="blood_group"
+            placeholder="Blood Group (if blood donor)"
+            className="form-input w-full"
+            onChange={handleChange}
           />
+          <button
+            type="button"
+            onClick={handleLocation}
+            className="bg-gray-200 px-4 py-2 rounded-lg w-full"
+          >
+            📍 Use Current Location
+          </button>
 
-          {/* Longitude */}
-          <input
-            type="number"
-            placeholder="Longitude"
-            value={longitude}
-            onChange={(e) => setLongitude(e.target.value)}
-            className="form-input"
-            required
-          />
-
-          {/* Submit Button */}
-          <div className="md:col-span-2 mt-4">
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-red-500 hover:to-rose-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Register Now
-            </button>
-          </div>
+          <button type="submit" className="primary-btn w-full">
+            Register
+          </button>
 
         </form>
-
       </div>
-
     </div>
   );
-
 }

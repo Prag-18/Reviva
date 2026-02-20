@@ -49,7 +49,7 @@ export default function Requests({ user }) {
   if (loading) return <div className="p-10">Loading...</div>;
 
   return (
-    <div className="p-10 space-y-8">
+    <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
 
       <h1 className="text-3xl font-bold text-rose-600">
         {user.role === "donor" ? "Received Requests" : "Sent Requests"}

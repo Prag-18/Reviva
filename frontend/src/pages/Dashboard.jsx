@@ -1,243 +1,290 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import NearbyDonors from "./NearbyDonors";
 
 export default function Dashboard() {
-    const [user, setUser] = useState(null);
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-    const [notification, setNotification] = useState("");
+  const [user, setUser] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("all");
 
-    // ================= FETCH USER =================
-    const fetchUser = async () => {
-        try {
-            const res = await API.get("/me");
-            setUser(res.data);
-        } catch (err) {
-            console.error("Error fetching user", err);
-        }
-    };
+  useEffect(() => {
+  if (!user) return;
 
-    // ================= FETCH REQUESTS =================
-    const fetchRequests = async (userId) => {
-        try {
-            const res = await API.get(`/my-requests/${userId}`);
-            setRequests(res.data);
-        } catch (err) {
-            console.error("Error fetching requests", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${user.id}`);
 
-    // ================= TOGGLE AVAILABILITY =================
-    const toggleAvailability = async () => {
-        try {
-            const res = await API.put("/toggle-availability");
-            setUser({ ...user, available: res.data.available });
-        } catch (err) {
-            console.error("Error toggling availability", err);
-        }
-    };
+  ws.onmessage = (event) => {
+    console.log("WebSocket message:", event.data);
 
-    // ================= ACCEPT REQUEST =================
-    const acceptRequest = async (id) => {
-        try {
-            await API.put(`/accept-request/${id}`);
-            fetchRequests(user.id);
-        } catch (err) {
-            alert(err.response?.data?.detail || "Error accepting request");
-        }
-    };
+    // Refresh requests for ANY update
+    fetchRequests(user.id);
+  };
 
-    // ================= REJECT REQUEST =================
-    const rejectRequest = async (id) => {
-        try {
-            await API.put(`/reject-request/${id}`);
-            fetchRequests(user.id);
-        } catch (err) {
-            alert(err.response?.data?.detail || "Error rejecting request");
-        }
-    };
+  ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+  };
 
-    // ================= WEBSOCKET =================
-    useEffect(() => {
-        if (!user) return;
+  return () => ws.close();
+}, [user]);
 
-        const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${user.id}`);
-
-        ws.onmessage = (event) => {
-            if (event.data === "new_request") {
-                setNotification("🔔 New donation request received!");
-                fetchRequests(user.id);
-                setTimeout(() => setNotification(""), 4000);
-            }
-        };
-
-        return () => ws.close();
-    }, [user]);
-
-    // ================= INITIAL LOAD =================
-    useEffect(() => {
-        const loadData = async () => {
-            await fetchUser();
-        };
-        loadData();
-    }, []);
-
-    useEffect(() => {
-        if (user) {
-            fetchRequests(user.id);
-        }
-    }, [user]);
-
-    if (loading || !user) {
-        return <div className="p-10 text-center">Loading...</div>;
+  // ================= FETCH USER =================
+  const fetchUser = async () => {
+    try {
+      const res = await API.get("/me");
+      setUser(res.data);
+    } catch (err) {
+      console.error("Error fetching user", err);
     }
+  };
 
-    // ================= CALCULATE STATS =================
-    const total = requests.length;
-    const pending = requests.filter((r) => r.status === "pending").length;
-    const accepted = requests.filter((r) => r.status === "accepted").length;
+  // ================= FETCH REQUESTS =================
+  const fetchRequests = async (userId) => {
+    try {
+      const res = await API.get(`/my-requests/${userId}`);
+      setRequests(res.data);
+    } catch (err) {
+      console.error("Error fetching requests", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const urgencyColors = {
-        low: "text-blue-500",
-        medium: "text-yellow-500",
-        high: "text-orange-500",
-        critical: "text-red-600 font-bold",
-    };
+  // ================= TOGGLE AVAILABILITY =================
+  const toggleAvailability = async () => {
+    try {
+      const res = await API.put("/toggle-availability");
+      setUser({ ...user, available: res.data.available });
+    } catch (err) {
+      console.error("Error toggling availability", err);
+    }
+  };
 
-    const statusColors = {
-        pending: "bg-yellow-100 text-yellow-700",
-        accepted: "bg-green-100 text-green-700",
-        rejected: "bg-red-100 text-red-700",
-    };
+  // ================= ACCEPT REQUEST =================
+  const acceptRequest = async (id) => {
+    try {
+      await API.put(`/accept-request/${id}`);
+      fetchRequests(user.id);
+    } catch (err) {
+      alert("Error accepting request");
+    }
+  };
 
-    return (
-        <div className="p-8 space-y-8">
+  // ================= REJECT REQUEST =================
+  const rejectRequest = async (id) => {
+    try {
+      await API.put(`/reject-request/${id}`);
+      fetchRequests(user.id);
+    } catch (err) {
+      alert("Error rejecting request");
+    }
+  };
 
-            {/* Notification */}
-            {notification && (
-                <div className="bg-rose-500 text-white px-6 py-3 rounded-xl shadow-lg">
-                    {notification}
-                </div>
-            )}
+  // ================= INITIAL LOAD =================
+  useEffect(() => {
+    fetchUser();
+  }, []);
 
-            {/* Welcome Section */}
-            <div>
-                <h1 className="text-3xl font-bold text-rose-600">
-                    Welcome, {user.name} 👋
-                </h1>
-                <p className="text-gray-600">
-                    Role: {user.role} | Blood Group: {user.blood_group}
-                </p>
-            </div>
+  useEffect(() => {
+    if (user) {
+      fetchRequests(user.id);
+    }
+  }, [user]);
 
-            {/* Stats Cards */}
-            <div className="grid md:grid-cols-3 gap-6">
-                <div className="card text-center">
-                    <p>Total Requests</p>
-                    <h2 className="text-3xl font-bold text-rose-600">{total}</h2>
-                </div>
+  if (loading || !user) {
+    return <div className="p-10 text-center">Loading...</div>;
+  }
+  const now = new Date();
 
-                <div className="card text-center">
-                    <p>Pending</p>
-                    <h2 className="text-3xl font-bold text-yellow-500">{pending}</h2>
-                </div>
+  const timeFilteredRequests = requests.filter((req) => {
+    if (timeFilter === "all") return true;
 
-                <div className="card text-center">
-                    <p>Accepted</p>
-                    <h2 className="text-3xl font-bold text-green-600">{accepted}</h2>
-                </div>
-            </div>
+    const createdDate = new Date(req.created_at);
 
-            {/* Donor Availability Toggle */}
-            {user.role === "donor" && (
-                <button
-                    onClick={toggleAvailability}
-                    className={`primary-btn ${user.available
-                        ? "bg-green-500 hover:bg-green-600"
-                        : "bg-red-500 hover:bg-red-600"
-                        }`}
-                >
-                    {user.available ? "Set Unavailable" : "Set Available"}
-                </button>
-            )}
+    const diffInDays =
+      (now - createdDate) / (1000 * 60 * 60 * 24);
 
-            {/* Seeker Nearby Donors */}
-            {user.role === "seeker" && <NearbyDonors />}
+    if (timeFilter === "today") return diffInDays <= 1;
+    if (timeFilter === "7days") return diffInDays <= 7;
+    if (timeFilter === "30days") return diffInDays <= 30;
 
-            {/* Requests Section */}
-            <div>
-                <h2 className="text-2xl font-semibold mb-4">
-                    {user.role === "donor"
-                        ? "Received Requests"
-                        : "Sent Requests"}
-                </h2>
+    return true;
+  });
 
-                <div className="space-y-6">
-                    {requests.length === 0 && (
-                        <p className="text-gray-500">No requests yet.</p>
-                    )}
+  // ================= STATS =================
+  const total = requests.length;
+  const pending = requests.filter((r) => r.status === "pending").length;
+  const accepted = requests.filter((r) => r.status === "accepted").length;
+  const rejected = requests.filter((r) => r.status === "rejected").length;
 
-                    {requests.map((req) => (
-                        <div key={req.id} className="card">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h3 className="text-lg font-semibold">
-                                        {user.role === "donor"
-                                            ? req.seeker_name
-                                            : req.donor_name}
-                                    </h3>
+  const filteredRequests =
+    filter === "all"
+      ? requests
+      : requests.filter((r) => r.status === filter);
 
-                                    {req.organ_type === "blood" && (
-                                        <p className="text-sm text-gray-500">
-                                            Blood Group: {req.seeker_blood_group}
-                                        </p>
-                                    )}
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-10 space-y-12">
 
-                                    <p className="text-sm text-gray-600 font-medium mt-1">
-                                        Organ: {req.organ_type?.toUpperCase()}
-                                    </p>
+      {/* HERO */}
+      <div className="bg-gradient-to-r from-rose-600 via-pink-500 to-red-500 text-white p-10 rounded-3xl shadow-xl">
+        <h1 className="text-4xl font-bold">
+          Welcome back, {user.name} ❤️
+        </h1>
+
+        <button
+          onClick={() => navigate("/profile")}
+          className="mt-6 bg-white text-rose-600 px-6 py-2 rounded-xl font-semibold shadow hover:shadow-lg"
+        >
+          Go to Profile
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-3 mb-6">
+
+        {[
+          { label: "All Time", value: "all" },
+          { label: "Today", value: "today" },
+          { label: "Last 7 Days", value: "7days" },
+          { label: "Last 30 Days", value: "30days" },
+        ].map((option) => (
+          <button
+            key={option.value}
+            onClick={() => setTimeFilter(option.value)}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${timeFilter === option.value
+                ? "bg-rose-600 text-white"
+                : "bg-gray-200 text-gray-700"
+              }`}
+          >
+            {option.label}
+          </button>
+        ))}
+
+      </div>
 
 
-                                    <p className={`mt-2 ${urgencyColors[req.urgency]}`}>
-                                        Urgency: {req.urgency.toUpperCase()}
-                                    </p>
-                                </div>
+      {/* STATS CARDS */}
+      <div className="grid md:grid-cols-4 gap-6">
 
-                                <span
-                                    className={`px-3 py-1 rounded-full text-sm font-semibold ${statusColors[req.status]
-                                        }`}
-                                >
-                                    {req.status.toUpperCase()}
-                                </span>
-                            </div>
-
-                            {/* Accept / Reject Buttons */}
-                            {user.role === "donor" &&
-                                req.status === "pending" && (
-                                    <div className="flex gap-4 mt-4">
-                                        <button
-                                            onClick={() => acceptRequest(req.id)}
-                                            className="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600"
-                                        >
-                                            Accept
-                                        </button>
-
-                                        <button
-                                            onClick={() => rejectRequest(req.id)}
-                                            className="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600"
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                )}
-                        </div>
-                    ))}
-                </div>
-            </div>
+        {/* TOTAL */}
+        <div
+          onClick={() => setFilter("all")}
+          className={`card text-center cursor-pointer transition hover:scale-105 ${filter === "all" ? "ring-2 ring-rose-500" : ""
+            }`}
+        >
+          <p className="text-gray-500">Total</p>
+          <h2 className="text-4xl font-bold text-rose-600 mt-2">
+            {total}
+          </h2>
         </div>
-    );
+
+        {/* PENDING */}
+        <div
+          onClick={() => setFilter("pending")}
+          className={`card text-center cursor-pointer transition hover:scale-105 ${filter === "pending" ? "ring-2 ring-yellow-500" : ""
+            }`}
+        >
+          <p className="text-gray-500">Pending</p>
+          <h2 className="text-4xl font-bold text-yellow-500 mt-2">
+            {pending}
+          </h2>
+        </div>
+
+        {/* ACCEPTED */}
+        <div
+          onClick={() => setFilter("accepted")}
+          className={`card text-center cursor-pointer transition hover:scale-105 ${filter === "accepted" ? "ring-2 ring-green-500" : ""
+            }`}
+        >
+          <p className="text-gray-500">Accepted</p>
+          <h2 className="text-4xl font-bold text-green-600 mt-2">
+            {accepted}
+          </h2>
+        </div>
+
+        {/* REJECTED */}
+        <div
+          onClick={() => setFilter("rejected")}
+          className={`card text-center cursor-pointer transition hover:scale-105 ${filter === "rejected" ? "ring-2 ring-red-500" : ""
+            }`}
+        >
+          <p className="text-gray-500">Rejected</p>
+          <h2 className="text-4xl font-bold text-red-600 mt-2">
+            {rejected}
+          </h2>
+        </div>
+
+      </div>
+
+
+      {/* SEEKER SEARCH */}
+      {user.role === "seeker" && <NearbyDonors />}
+
+      {/* REQUESTS */}
+      <div>
+        <p className="text-gray-500">
+          Showing: <span className="font-semibold capitalize">{filter}</span> requests
+        </p>
+
+        <h2 className="text-3xl font-bold mb-6">
+          {user.role === "donor"
+            ? "Received Requests"
+            : "Sent Requests"}
+        </h2>
+
+        {requests.length === 0 && (
+          <p className="text-gray-500">No requests yet.</p>
+        )}
+
+        <div className="space-y-6">
+          {filteredRequests.map((req) => (
+            <div key={req.id} className="card">
+
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {user.role === "donor"
+                      ? req.seeker_name
+                      : req.donor_name}
+                  </h3>
+
+                  <p className="text-gray-600">
+                    Organ: {req.organ_type?.toUpperCase()}
+                  </p>
+
+                  <p className="text-gray-500">
+                    Urgency: {req.urgency.toUpperCase()}
+                  </p>
+                </div>
+
+                <span className="px-4 py-1 rounded-full bg-gray-200">
+                  {req.status.toUpperCase()}
+                </span>
+              </div>
+
+              {user.role === "donor" && req.status === "pending" && (
+                <div className="flex gap-4 mt-4">
+                  <button
+                    onClick={() => acceptRequest(req.id)}
+                    className="bg-green-500 text-white px-4 py-2 rounded-xl"
+                  >
+                    Accept
+                  </button>
+
+                  <button
+                    onClick={() => rejectRequest(req.id)}
+                    className="bg-red-500 text-white px-4 py-2 rounded-xl"
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
 }
