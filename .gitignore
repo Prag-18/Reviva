@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Flutter
+.metadata
+build/
+.dart_tool/
+pubspec.lock
+
+# Node (if any)
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
