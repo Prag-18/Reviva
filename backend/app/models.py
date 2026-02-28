@@ -54,6 +54,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_read = Column(Boolean, default=False)
+    status = Column(String, default="sent")
 
     sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_messages")
     receiver = relationship("User", foreign_keys=[receiver_id], back_populates="received_messages")

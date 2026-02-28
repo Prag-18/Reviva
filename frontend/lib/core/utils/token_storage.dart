@@ -1,20 +1,26 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class TokenStorage {
-  static const _tokenKey = "auth_token";
+  static const _tokenKey = 'auth_token';
+  static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
   static Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    try {
+      await _storage.write(key: _tokenKey, value: token);
+    } catch (_) {}
   }
 
   static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    try {
+      return _storage.read(key: _tokenKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
+    try {
+      await _storage.delete(key: _tokenKey);
+    } catch (_) {}
   }
 }

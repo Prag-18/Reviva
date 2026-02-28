@@ -1,118 +1,116 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import '../../data/services/api_service.dart';
-import '../../core/utils/token_storage.dart';
-import '../home/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class LoginScreen extends StatefulWidget {
+import 'register_screen.dart';
+import 'state/auth_controller.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiService = ApiService();
 
-  bool _loading = false;
-  String? _error;
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
-    if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
-      setState(() {
-        _error = "Email and password are required";
-      });
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email and password are required')),
+      );
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final response = await _apiService.login(
-        _emailController.text,
-        _passwordController.text,
-      );
-
-      final token = response.data["access_token"];
-
-      await TokenStorage.saveToken(token);
-
-      final api = ApiService();
-      final userResponse = await api.getMe();
-
-      print("User Data: ${userResponse.data}");
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen(user: userResponse.data)),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login successful")));
-    } on DioException catch (e) {
-      final detail = e.response?.data is Map<String, dynamic>
-          ? e.response?.data["detail"]?.toString()
-          : null;
-
-      if (!mounted) return;
-      setState(() {
-        _error = detail ?? "Login failed";
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = "Login failed";
-      });
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-    });
+    await ref.read(authControllerProvider.notifier).login(email, password);
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final loading = authState.isLoading;
+
     return Scaffold(
       body: Center(
-        child: SizedBox(
-          width: 350,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                "Login",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: "Email"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Password"),
-              ),
-              const SizedBox(height: 20),
-              if (_error != null)
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 10),
-              _loading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _login,
-                      child: const Text("Login"),
-                    ),
-            ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Reviva',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Secure donor communication',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 26),
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: loading ? null : _login,
+                    child: loading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Login'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
+                        },
+                  child: const Text('Create a new account'),
+                ),
+                if (authState.hasError) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    authState.error.toString(),
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

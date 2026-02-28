@@ -1,47 +1,64 @@
-import 'package:dio/dio.dart';
-import '../../core/config/app_config.dart';
-import '../../core/utils/token_storage.dart';
+import '../../core/network/api_client.dart';
 
+@Deprecated('Use dedicated services/repositories instead.')
 class ApiService {
-  late Dio _dio;
+  final ApiClient _api = ApiClient.instance;
 
-  ApiService() {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: AppConfig.baseUrl,
-      ),
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await _api.post(
+      '/login',
+      authorized: false,
+      formUrlEncoded: true,
+      body: {'username': email, 'password': password},
     );
-
-    // 🔥 Interceptor to attach token automatically
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await TokenStorage.getToken();
-          if (token != null) {
-            options.headers["Authorization"] = "Bearer $token";
-          }
-          return handler.next(options);
-        },
-      ),
-    );
+    return (_api.decodeBody(response) as Map).cast<String, dynamic>();
   }
 
-  Future<Response> login(String email, String password) async {
-    final formData = FormData.fromMap({
-      "username": email,
-      "password": password,
-    });
-
-    return await _dio.post(
-      "/login",
-      data: formData,
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
-    );
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _api.get('/me');
+    return (_api.decodeBody(response) as Map).cast<String, dynamic>();
   }
 
-  Future<Response> getMe() async {
-    return await _dio.get("/me");
+  Future<List<dynamic>> getChatConversations() async {
+    final response = await _api.get('/chat/conversations');
+    return _api.decodeBody(response) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getChatHistory(String otherUserId) async {
+    final response = await _api.get('/chat/history/$otherUserId');
+    return _api.decodeBody(response) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getNearbyDonors({
+    required double latitude,
+    required double longitude,
+    required String organType,
+    double radiusKm = 5,
+  }) async {
+    final response = await _api.get(
+      '/nearby-donors',
+      queryParameters: {
+        'latitude': latitude,
+        'longitude': longitude,
+        'organ_type': organType,
+        'radius_km': radiusKm,
+      },
+    );
+    return _api.decodeBody(response) as List<dynamic>;
+  }
+
+  Future<void> createRequest({
+    required String donorId,
+    required String organType,
+    String urgency = 'medium',
+  }) async {
+    await _api.post(
+      '/create-request',
+      queryParameters: {
+        'donor_id': donorId,
+        'organ_type': organType,
+        'urgency': urgency,
+      },
+    );
   }
 }

@@ -1,4 +1,3 @@
-from urllib import request
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session, joinedload
 import uuid
@@ -6,6 +5,7 @@ import uuid
 from .. import models
 from ..auth import get_current_user
 from ..database import get_db
+from .chat import chat_manager
 
 router = APIRouter()
 
@@ -18,10 +18,10 @@ REJECTED_STATUS = "rejected"
 
 # ================= NOTIFY DONOR =================
 async def _notify_user(app_request: Request, user_id: uuid.UUID, message: str) -> None:
-    active_connections = getattr(app_request.app.state, "active_connections", [])
-    for uid, connection in active_connections:
-        if uid == str(user_id):
-            await connection.send_text(message)
+    await chat_manager.send_to_user(
+        str(user_id),
+        {"type": message},
+    )
 
 
 # ================= CREATE REQUEST =================

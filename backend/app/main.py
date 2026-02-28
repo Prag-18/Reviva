@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from .database import engine
 from . import models
@@ -10,6 +11,20 @@ from .routes import users, donors, requests, chat
 # CREATE TABLES
 # ==============================
 models.Base.metadata.create_all(bind=engine)
+
+
+def _run_startup_migrations() -> None:
+    # Keep existing databases compatible after adding messages.status
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'sent'")
+        )
+        conn.execute(
+            text("UPDATE messages SET status = 'sent' WHERE status IS NULL")
+        )
+
+
+_run_startup_migrations()
 
 
 # ==============================

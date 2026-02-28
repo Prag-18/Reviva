@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/splash_screen.dart';
+import 'features/auth/state/auth_gate.dart';
 
 void main() {
   runApp(const ProviderScope(child: MyApp()));
@@ -16,7 +16,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Organ Donor App',
       theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+      themeMode: ThemeMode.system,
+      darkTheme: AppTheme.darkTheme,
+      home: const AuthGate(),
     );
   }
 }

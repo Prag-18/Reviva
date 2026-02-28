@@ -27,11 +27,15 @@ class ChatConnectionManager:
             self.active[user_id] = []
         self.active[user_id].append(websocket)
 
-    def disconnect(self, user_id: str, websocket: WebSocket):
+        await self.broadcast_status(user_id, "online")
+
+    async def disconnect(self, user_id: str, websocket: WebSocket):
         if user_id in self.active:
             self.active[user_id].remove(websocket)
             if not self.active[user_id]:
                 del self.active[user_id]
+
+        await self.broadcast_status(user_id, "offline")
 
     async def send_to_user(self, user_id: str, message: dict):
         connections = self.active.get(str(user_id), [])
@@ -40,6 +44,15 @@ class ChatConnectionManager:
                 await ws.send_text(json.dumps(message))
             except Exception:
                 pass
+
+    async def broadcast_status(self, user_id: str, status: str):
+        for uid in self.active:
+            if uid != user_id:
+                await self.send_to_user(uid, {
+                    "type": "status",
+                    "user_id": user_id,
+                    "status": status
+                })
 
 
 chat_manager = ChatConnectionManager()
@@ -90,8 +103,34 @@ async def chat_websocket(
 
             try:
                 data = json.loads(raw)
+                msg_type = data.get("type", "message")
                 receiver_id = uuid.UUID(data["receiver_id"])
-                content = data["content"].strip()
+
+                if msg_type == "typing":
+                    await chat_manager.send_to_user(
+                        str(receiver_id),
+                        {
+                            "type": "typing",
+                            "sender_id": user_id
+                        }
+                    )
+                    continue
+
+                if msg_type == "stop_typing":
+                    await chat_manager.send_to_user(
+                        str(receiver_id),
+                        {
+                            "type": "stop_typing",
+                            "sender_id": user_id
+                        }
+                    )
+                    continue
+
+                if msg_type != "message":
+                    await websocket.send_text(json.dumps({"error": "Unsupported message type"}))
+                    continue
+
+                content = data.get("content", "").strip()
             except Exception:
                 await websocket.send_text(json.dumps({"error": "Invalid message format"}))
                 continue
@@ -105,11 +144,16 @@ async def chat_websocket(
                 await websocket.send_text(json.dumps({"error": "Receiver not found"}))
                 continue
 
+            receiver_online = str(receiver_id) in chat_manager.active and bool(
+                chat_manager.active.get(str(receiver_id))
+            )
+
             # Save message to DB
             message = models.Message(
                 sender_id=token_user_id,
                 receiver_id=receiver_id,
                 content=content,
+                status="delivered" if receiver_online else "sent",
             )
             db.add(message)
             db.commit()
@@ -123,6 +167,7 @@ async def chat_websocket(
                 "content": message.content,
                 "created_at": message.created_at.isoformat(),
                 "is_read": message.is_read,
+                "status": message.status,
             }
 
             # Deliver to receiver if online
@@ -132,7 +177,7 @@ async def chat_websocket(
             await chat_manager.send_to_user(user_id, payload_out)
 
     except WebSocketDisconnect:
-        chat_manager.disconnect(user_id, websocket)
+        await chat_manager.disconnect(user_id, websocket)
 
 
 # ======================================
@@ -140,7 +185,7 @@ async def chat_websocket(
 # GET /chat/history/{other_user_id}
 # ======================================
 @router.get("/chat/history/{other_user_id}")
-def get_chat_history(
+async def get_chat_history(
     other_user_id: uuid.UUID,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -172,12 +217,26 @@ def get_chat_history(
     )
 
     # Mark messages sent to current_user as read
-    db.query(models.Message).filter(
+    updated = db.query(models.Message).filter(
         models.Message.sender_id == other_user_id,
         models.Message.receiver_id == current_user.id,
         models.Message.is_read == False,
-    ).update({"is_read": True})
+    ).all()
+
+    for msg in updated:
+        msg.is_read = True
+        msg.status = "read"
+
     db.commit()
+
+    for msg in updated:
+        await chat_manager.send_to_user(
+            str(other_user_id),
+            {
+                "type": "read_receipt",
+                "message_id": str(msg.id)
+            }
+        )
 
     return [
         {
@@ -187,6 +246,7 @@ def get_chat_history(
             "content": m.content,
             "created_at": m.created_at.isoformat(),
             "is_read": m.is_read,
+            "status": m.status,
         }
         for m in messages
     ]
