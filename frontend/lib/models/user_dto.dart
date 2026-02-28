@@ -6,6 +6,8 @@ class UserDto {
   final String? bloodGroup;
   final bool available;
   final String? phone;
+  final bool isVerifiedDonor;
+  final String verificationStatus;
 
   const UserDto({
     required this.id,
@@ -15,6 +17,8 @@ class UserDto {
     this.bloodGroup,
     required this.available,
     this.phone,
+    this.isVerifiedDonor = false,
+    this.verificationStatus = 'pending',
   });
 
   factory UserDto.fromJson(Map<String, dynamic> json) {
@@ -26,6 +30,8 @@ class UserDto {
       bloodGroup: json['blood_group']?.toString(),
       available: json['available'] == true,
       phone: json['phone']?.toString(),
+      isVerifiedDonor: json['is_verified_donor'] == true,
+      verificationStatus: json['verification_status']?.toString() ?? 'pending',
     );
   }
 
@@ -38,6 +44,8 @@ class UserDto {
       'blood_group': bloodGroup,
       'available': available,
       'phone': phone,
+      'is_verified_donor': isVerifiedDonor,
+      'verification_status': verificationStatus,
     };
   }
 }

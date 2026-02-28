@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../core/utils/location_service.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -21,7 +22,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _role = 'seeker';
   String _donationType = 'blood';
   bool _loading = false;
+  bool _capturingLocation = false;
   String? _error;
+  double? _latitude;
+  double? _longitude;
 
   static const _donationTypes = [
     'blood',
@@ -41,6 +45,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _phoneController.dispose();
     _bloodGroupController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _captureLocation() async {
+    setState(() {
+      _capturingLocation = true;
+      _error = null;
+    });
+
+    try {
+      final position = await LocationService.getCurrentLocation();
+      if (!mounted) return false;
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _error = 'Unable to capture location: $e';
+      });
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _capturingLocation = false;
+        });
+      }
+    }
   }
 
   Future<void> _register() async {
@@ -64,6 +97,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
+    if (_role == 'donor' && (_latitude == null || _longitude == null)) {
+      final captured = await _captureLocation();
+      if (!captured) {
+        setState(() {
+          _error = 'Location is required for donor registration';
+        });
+        return;
+      }
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -82,6 +125,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             phone: _phoneController.text.trim().isEmpty
                 ? null
                 : _phoneController.text.trim(),
+            latitude: _latitude,
+            longitude: _longitude,
           );
 
       if (!mounted) return;
@@ -183,6 +228,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration:
                         const InputDecoration(labelText: 'Phone (optional)'),
                   ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: (_loading || _capturingLocation)
+                        ? null
+                        : _captureLocation,
+                    icon: const Icon(Icons.my_location),
+                    label: Text(
+                      _capturingLocation
+                          ? 'Capturing location...'
+                          : _latitude == null || _longitude == null
+                              ? 'Use Current Location'
+                              : 'Location Captured',
+                    ),
+                  ),
+                  if (_latitude != null && _longitude != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Lat: ${_latitude!.toStringAsFixed(5)}, Lon: ${_longitude!.toStringAsFixed(5)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     Text(

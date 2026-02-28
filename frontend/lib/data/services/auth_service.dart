@@ -32,6 +32,8 @@ class AuthService {
     required String donationType,
     String? bloodGroup,
     String? phone,
+    double? latitude,
+    double? longitude,
   }) async {
     final queryParameters = <String, dynamic>{
       'name': name,
@@ -39,14 +41,34 @@ class AuthService {
       'password': password,
       'role': role,
       'donation_type': donationType,
-      if (bloodGroup != null && bloodGroup.isNotEmpty) 'blood_group': bloodGroup,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      if (bloodGroup?.isNotEmpty ?? false) 'blood_group': bloodGroup,
+      if (phone?.isNotEmpty ?? false) 'phone': phone,
     };
+    if (latitude != null) {
+      queryParameters['latitude'] = latitude;
+    }
+    if (longitude != null) {
+      queryParameters['longitude'] = longitude;
+    }
 
     await _apiClient.post(
       '/register',
       authorized: false,
       queryParameters: queryParameters,
     );
+  }
+
+  Future<void> updateMyLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    await _apiClient.put(
+      '/users/me',
+      body: {'latitude': latitude, 'longitude': longitude},
+    );
+  }
+
+  Future<void> updateAvailability(bool available) async {
+    await _apiClient.put('/users/me', body: {'available': available});
   }
 }

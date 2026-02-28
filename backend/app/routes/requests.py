@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 import uuid
 
 from .. import models
 from ..auth import get_current_user
 from ..database import get_db
+from ..services.audit import log_audit_event
 from .chat import chat_manager
 
 router = APIRouter()
@@ -17,7 +18,7 @@ REJECTED_STATUS = "rejected"
 
 
 # ================= NOTIFY DONOR =================
-async def _notify_user(app_request: Request, user_id: uuid.UUID, message: str) -> None:
+async def _notify_user(user_id: uuid.UUID, message: str) -> None:
     await chat_manager.send_to_user(
         str(user_id),
         {"type": message},
@@ -30,7 +31,6 @@ async def create_request(
     donor_id: uuid.UUID,
     urgency: str,
     organ_type: str,
-    request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -55,6 +55,9 @@ async def create_request(
 
     if not donor:
         raise HTTPException(status_code=404, detail="Donor not found")
+
+    if donor.verification_status != "approved" or not donor.is_verified_donor:
+        raise HTTPException(status_code=400, detail="Donor is not verified yet")
 
     if not donor.available:
         raise HTTPException(status_code=400, detail="Donor is currently unavailable")
@@ -93,7 +96,19 @@ async def create_request(
     db.commit()
     db.refresh(new_request)
 
-    await _notify_user(request, donor_id, "new_request")
+    log_audit_event(
+        db,
+        user_id=current_user.id,
+        action_type="request_creation",
+        metadata={
+            "request_id": str(new_request.id),
+            "donor_id": str(donor_id),
+            "organ_type": organ_type_normalized,
+            "urgency": urgency_normalized,
+        },
+    )
+
+    await _notify_user(donor_id, "new_request")
 
     return {
         "message": "Request sent successfully",
@@ -107,7 +122,6 @@ async def create_request(
 @router.put("/accept-request/{request_id}")
 async def accept_request(
     request_id: uuid.UUID,
-    request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -132,8 +146,8 @@ async def accept_request(
 
     donation_request.status = ACCEPTED_STATUS
     db.commit()
-    await _notify_user(request, donation_request.seeker_id, "request_accepted")
-    await _notify_user(request, current_user.id, "request_updated")
+    await _notify_user(donation_request.seeker_id, "request_accepted")
+    await _notify_user(current_user.id, "request_updated")
 
     return {"message": "Request accepted"}
 
@@ -142,7 +156,6 @@ async def accept_request(
 @router.put("/reject-request/{request_id}")
 async def reject_request(
     request_id: uuid.UUID,
-    request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -167,8 +180,8 @@ async def reject_request(
 
     donation_request.status = REJECTED_STATUS
     db.commit()
-    await _notify_user(request, donation_request.seeker_id, "request_rejected")
-    await _notify_user(request, current_user.id, "request_updated")
+    await _notify_user(donation_request.seeker_id, "request_rejected")
+    await _notify_user(current_user.id, "request_updated")
 
     return {"message": "Request rejected"}
 

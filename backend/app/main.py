@@ -1,10 +1,10 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from .database import engine
 from . import models
-from .routes import users, donors, requests, chat
+from .routes import users, donors, requests, chat, verification, admin, moderation
 
 
 # ==============================
@@ -14,13 +14,37 @@ models.Base.metadata.create_all(bind=engine)
 
 
 def _run_startup_migrations() -> None:
-    # Keep existing databases compatible after adding messages.status
+    # Keep existing databases compatible after adding trust-layer columns.
     with engine.begin() as conn:
         conn.execute(
             text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'sent'")
         )
         conn.execute(
             text("UPDATE messages SET status = 'sent' WHERE status IS NULL")
+        )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE")
+        )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE")
+        )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified_donor BOOLEAN DEFAULT FALSE")
+        )
+        conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status VARCHAR DEFAULT 'pending'")
+        )
+        conn.execute(
+            text("UPDATE users SET phone_verified = FALSE WHERE phone_verified IS NULL")
+        )
+        conn.execute(
+            text("UPDATE users SET email_verified = FALSE WHERE email_verified IS NULL")
+        )
+        conn.execute(
+            text("UPDATE users SET is_verified_donor = FALSE WHERE is_verified_donor IS NULL")
+        )
+        conn.execute(
+            text("UPDATE users SET verification_status = 'pending' WHERE verification_status IS NULL")
         )
 
 
@@ -49,28 +73,12 @@ app.add_middleware(
 # ROUTERS
 # ==============================
 app.include_router(users.router)
+app.include_router(verification.router)
+app.include_router(moderation.router)
+app.include_router(admin.router)
 app.include_router(donors.router)
 app.include_router(requests.router)
 app.include_router(chat.router)
-
-
-# ==============================
-# NOTIFICATION WEBSOCKET
-# ws://host/ws/{user_id}
-# ==============================
-app.state.active_connections = []
-
-
-@app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    await websocket.accept()
-    app.state.active_connections.append((user_id, websocket))
-
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        app.state.active_connections.remove((user_id, websocket))
 
 
 # ==============================

@@ -36,6 +36,8 @@ class AuthRepository {
     required String donationType,
     String? bloodGroup,
     String? phone,
+    double? latitude,
+    double? longitude,
   }) {
     return _service.register(
       name: name,
@@ -45,6 +47,19 @@ class AuthRepository {
       donationType: donationType,
       bloodGroup: bloodGroup,
       phone: phone,
+      latitude: latitude,
+      longitude: longitude,
     );
+  }
+
+  Future<void> updateLocation({
+    required double latitude,
+    required double longitude,
+  }) {
+    return _service.updateMyLocation(latitude: latitude, longitude: longitude);
+  }
+
+  Future<void> updateAvailability(bool available) {
+    return _service.updateAvailability(available);
   }
 }

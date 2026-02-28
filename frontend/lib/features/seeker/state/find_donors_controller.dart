@@ -21,12 +21,12 @@ class FindDonorsState {
   });
 
   factory FindDonorsState.initial() => const FindDonorsState(
-        donors: [],
-        loading: false,
-        error: null,
-        organType: 'blood',
-        radiusKm: 5,
-      );
+    donors: [],
+    loading: false,
+    error: null,
+    organType: 'blood',
+    radiusKm: 5,
+  );
 
   FindDonorsState copyWith({
     List<DonorDto>? donors,
@@ -47,8 +47,8 @@ class FindDonorsState {
 
 final findDonorsControllerProvider =
     StateNotifierProvider<FindDonorsController, FindDonorsState>(
-  (ref) => FindDonorsController(ref),
-);
+      (ref) => FindDonorsController(ref),
+    );
 
 class FindDonorsController extends StateNotifier<FindDonorsState> {
   final Ref _ref;
@@ -68,7 +68,9 @@ class FindDonorsController extends StateNotifier<FindDonorsState> {
 
     try {
       final position = await LocationService.getCurrentLocation();
-      final donors = await _ref.read(donorRepositoryProvider).fetchNearbyDonors(
+      final donors = await _ref
+          .read(donorRepositoryProvider)
+          .fetchNearbyDonors(
             latitude: position.latitude,
             longitude: position.longitude,
             organType: state.organType,
@@ -77,18 +79,20 @@ class FindDonorsController extends StateNotifier<FindDonorsState> {
       state = state.copyWith(donors: donors, loading: false, error: null);
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
-    } catch (_) {
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
       state = state.copyWith(
         loading: false,
-        error: 'Unable to fetch donors. Please try again.',
+        error: message.isEmpty
+            ? 'Unable to fetch donors. Please try again.'
+            : message,
       );
     }
   }
 
   Future<void> sendRequest(String donorId) {
-    return _ref.read(requestRepositoryProvider).createRequest(
-          donorId: donorId,
-          organType: state.organType,
-        );
+    return _ref
+        .read(requestRepositoryProvider)
+        .createRequest(donorId: donorId, organType: state.organType);
   }
 }

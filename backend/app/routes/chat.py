@@ -1,8 +1,7 @@
 import uuid
 import json
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 
@@ -56,6 +55,26 @@ class ChatConnectionManager:
 
 
 chat_manager = ChatConnectionManager()
+
+
+def _is_user_blocked(db: Session, user_a: uuid.UUID, user_b: uuid.UUID) -> bool:
+    block = (
+        db.query(models.UserBlock)
+        .filter(
+            or_(
+                and_(
+                    models.UserBlock.blocker_id == user_a,
+                    models.UserBlock.blocked_user_id == user_b,
+                ),
+                and_(
+                    models.UserBlock.blocker_id == user_b,
+                    models.UserBlock.blocked_user_id == user_a,
+                ),
+            )
+        )
+        .first()
+    )
+    return block is not None
 
 
 # ======================================
@@ -144,6 +163,10 @@ async def chat_websocket(
                 await websocket.send_text(json.dumps({"error": "Receiver not found"}))
                 continue
 
+            if _is_user_blocked(db, token_user_id, receiver_id):
+                await websocket.send_text(json.dumps({"error": "Messaging is disabled between these users"}))
+                continue
+
             receiver_online = str(receiver_id) in chat_manager.active and bool(
                 chat_manager.active.get(str(receiver_id))
             )
@@ -195,6 +218,9 @@ async def get_chat_history(
     other_user = db.query(models.User).filter(models.User.id == other_user_id).first()
     if not other_user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if _is_user_blocked(db, current_user.id, other_user_id):
+        raise HTTPException(status_code=403, detail="Messaging is disabled between these users")
 
     messages = (
         db.query(models.Message)
@@ -288,6 +314,23 @@ def get_conversations(
 
     rows = result.fetchall()
 
+    blocked_ids = set(
+        str(item)
+        for (item,) in (
+            db.query(models.UserBlock.blocked_user_id)
+            .filter(models.UserBlock.blocker_id == current_user.id)
+            .all()
+        )
+    )
+    blocked_ids.update(
+        str(item)
+        for (item,) in (
+            db.query(models.UserBlock.blocker_id)
+            .filter(models.UserBlock.blocked_user_id == current_user.id)
+            .all()
+        )
+    )
+
     return [
         {
             "other_user_id": str(row.other_user_id),
@@ -298,4 +341,5 @@ def get_conversations(
             "unread": not row.is_read and str(row.sender_id) != str(current_user.id),
         }
         for row in rows
+        if str(row.other_user_id) not in blocked_ids
     ]
