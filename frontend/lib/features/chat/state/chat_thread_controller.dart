@@ -23,12 +23,12 @@ class ChatThreadState {
   });
 
   factory ChatThreadState.initial() => const ChatThreadState(
-        messages: [],
-        loading: false,
-        otherUserTyping: false,
-        presence: 'offline',
-        error: null,
-      );
+    messages: [],
+    loading: false,
+    otherUserTyping: false,
+    presence: 'offline',
+    error: null,
+  );
 
   ChatThreadState copyWith({
     List<ChatMessageDto>? messages,
@@ -47,18 +47,18 @@ class ChatThreadState {
   }
 }
 
-final chatThreadControllerProvider = StateNotifierProvider.family<
-    ChatThreadController,
-    ChatThreadState,
-    String>((ref, otherUserId) => ChatThreadController(ref, otherUserId));
+final chatThreadControllerProvider =
+    StateNotifierProvider.family<ChatThreadController, ChatThreadState, String>(
+      (ref, receiverId) => ChatThreadController(ref, receiverId),
+    );
 
 class ChatThreadController extends StateNotifier<ChatThreadState> {
   final Ref _ref;
-  final String otherUserId;
+  final String receiverId;
   StreamSubscription<Map<String, dynamic>>? _subscription;
 
-  ChatThreadController(this._ref, this.otherUserId)
-      : super(ChatThreadState.initial()) {
+  ChatThreadController(this._ref, this.receiverId)
+    : super(ChatThreadState.initial()) {
     _init();
   }
 
@@ -81,10 +81,15 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
 
   Future<void> loadHistory() async {
     try {
-      final history = await _ref.read(chatRepositoryProvider).fetchHistory(otherUserId);
+      final history = await _ref
+          .read(chatRepositoryProvider)
+          .fetchHistory(receiverId);
       state = state.copyWith(messages: history, loading: false, error: null);
     } catch (_) {
-      state = state.copyWith(loading: false, error: 'Unable to load chat history');
+      state = state.copyWith(
+        loading: false,
+        error: 'Unable to load chat history',
+      );
     }
   }
 
@@ -95,21 +100,23 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
     final type = event['type']?.toString();
 
     if (type == 'typing' &&
-        (event['sender_id']?.toString() == otherUserId ||
-            event['from']?.toString() == otherUserId)) {
+        (event['sender_id']?.toString() == receiverId ||
+            event['from']?.toString() == receiverId)) {
       state = state.copyWith(otherUserTyping: true);
       return;
     }
 
     if (type == 'stop_typing' &&
-        (event['sender_id']?.toString() == otherUserId ||
-            event['from']?.toString() == otherUserId)) {
+        (event['sender_id']?.toString() == receiverId ||
+            event['from']?.toString() == receiverId)) {
       state = state.copyWith(otherUserTyping: false);
       return;
     }
 
-    if (type == 'status' && event['user_id']?.toString() == otherUserId) {
-      state = state.copyWith(presence: event['status']?.toString() ?? 'offline');
+    if (type == 'status' && event['user_id']?.toString() == receiverId) {
+      state = state.copyWith(
+        presence: event['status']?.toString() ?? 'offline',
+      );
       return;
     }
 
@@ -123,19 +130,21 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
     if (type != 'chat_message') return;
 
     final senderId = event['sender_id']?.toString();
-    final receiverId = event['receiver_id']?.toString();
+    final receiverIdFromEvent = event['receiver_id']?.toString();
     final isRelevant =
-        (senderId == otherUserId && receiverId == currentUser.id) ||
-            (senderId == currentUser.id && receiverId == otherUserId);
+        (senderId == receiverId && receiverIdFromEvent == currentUser.id) ||
+        (senderId == currentUser.id && receiverIdFromEvent == receiverId);
 
     if (!isRelevant) return;
 
     final incoming = ChatMessageDto.fromJson(event);
-    final optimisticIndex = state.messages.indexWhere((message) =>
-        message.isOptimistic &&
-        message.senderId == currentUser.id &&
-        message.receiverId == otherUserId &&
-        message.content == incoming.content);
+    final optimisticIndex = state.messages.indexWhere(
+      (message) =>
+          message.isOptimistic &&
+          message.senderId == currentUser.id &&
+          message.receiverId == receiverId &&
+          message.content == incoming.content,
+    );
 
     if (optimisticIndex != -1) {
       final updated = List<ChatMessageDto>.from(state.messages);
@@ -153,14 +162,14 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
   Future<void> sendTyping() async {
     await _ref.read(websocketManagerProvider).send({
       'type': 'typing',
-      'receiver_id': otherUserId,
+      'receiver_id': receiverId,
     });
   }
 
   Future<void> sendStopTyping() async {
     await _ref.read(websocketManagerProvider).send({
       'type': 'stop_typing',
-      'receiver_id': otherUserId,
+      'receiver_id': receiverId,
     });
   }
 
@@ -174,7 +183,7 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
     final optimistic = ChatMessageDto(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(9999)}',
       senderId: currentUser.id,
-      receiverId: otherUserId,
+      receiverId: receiverId,
       content: trimmed,
       createdAt: DateTime.now(),
       isRead: false,
@@ -187,7 +196,7 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
     try {
       await _ref.read(websocketManagerProvider).send({
         'type': 'message',
-        'receiver_id': otherUserId,
+        'receiver_id': receiverId,
         'content': trimmed,
       });
 
@@ -219,28 +228,40 @@ class ChatThreadController extends StateNotifier<ChatThreadState> {
 
     if (message.id.isEmpty) return;
 
-    _updateMessage(localId, (m) => m.copyWith(sendState: MessageSendState.sending));
+    _updateMessage(
+      localId,
+      (m) => m.copyWith(sendState: MessageSendState.sending),
+    );
 
     try {
       await _ref.read(websocketManagerProvider).send({
         'type': 'message',
-        'receiver_id': otherUserId,
+        'receiver_id': receiverId,
         'content': message.content,
       });
-      _updateMessage(localId, (m) => m.copyWith(sendState: MessageSendState.sent));
+      _updateMessage(
+        localId,
+        (m) => m.copyWith(sendState: MessageSendState.sent),
+      );
     } catch (_) {
-      _updateMessage(localId, (m) => m.copyWith(sendState: MessageSendState.failed));
+      _updateMessage(
+        localId,
+        (m) => m.copyWith(sendState: MessageSendState.failed),
+      );
     }
   }
 
   void _markReadById(String messageId) {
-    _updateMessage(messageId, (m) => m.copyWith(
-          isRead: true,
-          sendState: MessageSendState.read,
-        ));
+    _updateMessage(
+      messageId,
+      (m) => m.copyWith(isRead: true, sendState: MessageSendState.read),
+    );
   }
 
-  void _updateMessage(String id, ChatMessageDto Function(ChatMessageDto) updater) {
+  void _updateMessage(
+    String id,
+    ChatMessageDto Function(ChatMessageDto) updater,
+  ) {
     final idx = state.messages.indexWhere((m) => m.id == id);
     if (idx == -1) return;
     final updated = List<ChatMessageDto>.from(state.messages);

@@ -16,7 +16,7 @@ class ApiClient {
   final http.Client _client = http.Client();
 
   Uri _uri(String path, [Map<String, dynamic>? queryParameters]) {
-    final base = Uri.parse(AppConfig.baseUrl);
+    final base = Uri.parse(ApiConfig.baseUrl);
     return base.replace(
       path: '${base.path}$path',
       queryParameters:

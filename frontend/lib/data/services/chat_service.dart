@@ -16,8 +16,8 @@ class ChatService {
         .toList();
   }
 
-  Future<List<ChatMessageDto>> fetchHistory(String otherUserId) async {
-    final response = await _apiClient.get('/chat/history/$otherUserId');
+  Future<List<ChatMessageDto>> fetchHistory(String receiverId) async {
+    final response = await _apiClient.get('/chat/history/$receiverId');
     final data = _apiClient.decodeBody(response) as List<dynamic>;
     return data
         .whereType<Map<String, dynamic>>()

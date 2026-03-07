@@ -10,14 +10,14 @@ import 'state/chat_thread_controller.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final UserDto user;
-  final String otherUserId;
-  final String otherUserName;
+  final String receiverId;
+  final String receiverName;
 
   const ChatScreen({
     super.key,
     required this.user,
-    required this.otherUserId,
-    required this.otherUserName,
+    required this.receiverId,
+    required this.receiverName,
   });
 
   @override
@@ -32,7 +32,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    ref.listenManual(chatThreadControllerProvider(widget.otherUserId), (prev, next) {
+    ref.listenManual(chatThreadControllerProvider(widget.receiverId), (
+      prev,
+      next,
+    ) {
       final prevCount = prev?.messages.length ?? 0;
       if (next.messages.length > prevCount) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -62,12 +65,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isEmpty) return;
 
     _controller.clear();
-    await ref.read(chatThreadControllerProvider(widget.otherUserId).notifier).sendStopTyping();
-    await ref.read(chatThreadControllerProvider(widget.otherUserId).notifier).sendMessage(text);
+    await ref
+        .read(chatThreadControllerProvider(widget.receiverId).notifier)
+        .sendStopTyping();
+    await ref
+        .read(chatThreadControllerProvider(widget.receiverId).notifier)
+        .sendMessage(text);
   }
 
   void _onTextChanged(String value) {
-    final notifier = ref.read(chatThreadControllerProvider(widget.otherUserId).notifier);
+    final notifier = ref.read(
+      chatThreadControllerProvider(widget.receiverId).notifier,
+    );
     if (value.trim().isNotEmpty) {
       notifier.sendTyping();
     }
@@ -79,17 +88,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(chatThreadControllerProvider(widget.otherUserId));
+    final state = ref.watch(chatThreadControllerProvider(widget.receiverId));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inputBackground = isDark ? const Color(0xFF1F2937) : Colors.white;
     final inputTextColor = isDark ? Colors.white : Colors.black;
     final inputHintColor = isDark ? Colors.white70 : const Color(0xFF888888);
 
-    final presenceLabel =
-        state.presence == 'online' ? 'Online' : 'Last seen recently';
-    final presenceColor =
-        state.presence == 'online' ? const Color(0xFF16A34A) : Colors.grey;
+    final presenceLabel = state.presence == 'online'
+        ? 'Online'
+        : 'Last seen recently';
+    final presenceColor = state.presence == 'online'
+        ? const Color(0xFF16A34A)
+        : Colors.grey;
 
     return Scaffold(
       appBar: AppBar(
@@ -97,7 +108,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.otherUserName),
+            Text(widget.receiverName),
             const SizedBox(height: 2),
             Text(
               presenceLabel,
@@ -129,18 +140,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemBuilder: (context, index) {
                     final msg = state.messages[index];
                     final prev = index > 0 ? state.messages[index - 1] : null;
-                    final showDate = prev == null ||
+                    final showDate =
+                        prev == null ||
                         !_isSameDay(prev.createdAt, msg.createdAt);
 
                     return Column(
                       children: [
-                        if (showDate)
-                          _DateHeader(date: msg.createdAt),
+                        if (showDate) _DateHeader(date: msg.createdAt),
                         _MessageBubble(
                           message: msg,
                           isMe: msg.senderId == widget.user.id,
                           onRetry: () => ref
-                              .read(chatThreadControllerProvider(widget.otherUserId).notifier)
+                              .read(
+                                chatThreadControllerProvider(
+                                  widget.receiverId,
+                                ).notifier,
+                              )
                               .retryMessage(msg.id),
                         ),
                       ],
@@ -185,10 +200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _send,
-                ),
+                IconButton(icon: const Icon(Icons.send), onPressed: _send),
               ],
             ),
           ),
@@ -260,13 +272,16 @@ class _MessageBubble extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
-            crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isMe
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
             children: [
               Text(
                 message.content,
                 style: TextStyle(
-                  color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                  color: isMe
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 3),
@@ -279,10 +294,9 @@ class _MessageBubble extends StatelessWidget {
                       fontSize: 11,
                       color: isMe
                           ? Colors.white.withValues(alpha: 0.9)
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.7),
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   if (isMe) ...[
@@ -312,18 +326,29 @@ class _StatusIcon extends StatelessWidget {
         return const SizedBox(
           width: 12,
           height: 12,
-          child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+          child: CircularProgressIndicator(
+            strokeWidth: 1.6,
+            color: Colors.white,
+          ),
         );
       case MessageSendState.sent:
         return const Icon(Icons.check, size: 14, color: Colors.white);
       case MessageSendState.delivered:
         return const Icon(Icons.done_all, size: 14, color: Colors.white70);
       case MessageSendState.read:
-        return const Icon(Icons.done_all, size: 14, color: Colors.lightBlueAccent);
+        return const Icon(
+          Icons.done_all,
+          size: 14,
+          color: Colors.lightBlueAccent,
+        );
       case MessageSendState.failed:
         return GestureDetector(
           onTap: onRetry,
-          child: const Icon(Icons.error_outline, size: 14, color: Colors.yellowAccent),
+          child: const Icon(
+            Icons.error_outline,
+            size: 14,
+            color: Colors.yellowAccent,
+          ),
         );
     }
   }

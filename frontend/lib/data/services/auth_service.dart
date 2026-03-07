@@ -71,4 +71,8 @@ class AuthService {
   Future<void> updateAvailability(bool available) async {
     await _apiClient.put('/users/me', body: {'available': available});
   }
+
+  Future<void> updateDonationType(String donationType) async {
+    await _apiClient.put('/users/me', body: {'donation_type': donationType});
+  }
 }

@@ -62,4 +62,8 @@ class AuthRepository {
   Future<void> updateAvailability(bool available) {
     return _service.updateAvailability(available);
   }
+
+  Future<void> updateDonationType(String donationType) {
+    return _service.updateDonationType(donationType);
+  }
 }

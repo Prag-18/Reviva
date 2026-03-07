@@ -1,6 +1,7 @@
 import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from geoalchemy2.shape import from_shape
@@ -41,23 +42,43 @@ async def login(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    form_data = await request.form()
-    email = form_data.get("username") or form_data.get("email")
-    password = form_data.get("password")
+    email = None
+    password = None
+
+    try:
+        form_data = await request.form()
+        email = form_data.get("username") or form_data.get("email")
+        password = form_data.get("password")
+    except Exception:
+        pass
+
+    if not email or not password:
+        try:
+            json_data = await request.json()
+        except Exception:
+            json_data = {}
+        if isinstance(json_data, dict):
+            email = email or json_data.get("username") or json_data.get("email")
+            password = password or json_data.get("password")
 
     if not email or not password:
         email = request.query_params.get("email") or request.query_params.get("username")
         password = request.query_params.get("password")
 
-    if not email or not password:
+    email_normalized = str(email).strip().lower() if email is not None else ""
+    password_value = str(password) if password is not None else ""
+
+    if not email_normalized or not password_value:
         raise HTTPException(status_code=422, detail="Missing login credentials")
 
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = db.query(models.User).filter(
+        func.lower(models.User.email) == email_normalized
+    ).first()
 
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email")
 
-    if not pwd_context.verify(password, user.password):
+    if not pwd_context.verify(password_value, user.password):
         raise HTTPException(status_code=400, detail="Invalid password")
 
     if ENFORCE_EMAIL_VERIFICATION and not user.email_verified:
@@ -103,6 +124,7 @@ def register_user(
     longitude: float = None,
     db: Session = Depends(get_db)
 ):
+    email_normalized = email.lower().strip()
     role_normalized = role.lower().strip()
     donation_type_normalized = donation_type.lower().strip()
 
@@ -118,7 +140,9 @@ def register_user(
     if role_normalized == "donor" and (latitude is None or longitude is None):
         raise HTTPException(status_code=400, detail="Location is required for donor registration")
 
-    existing_user = db.query(models.User).filter(models.User.email == email).first()
+    existing_user = db.query(models.User).filter(
+        func.lower(models.User.email) == email_normalized
+    ).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -132,7 +156,7 @@ def register_user(
 
     user = models.User(
         name=name,
-        email=email,
+        email=email_normalized,
         password=hashed_pw,
         role=role_normalized,
         blood_group=blood_group,
@@ -151,7 +175,7 @@ def register_user(
     db.refresh(user)
 
     verification_token = create_email_verification_token(user_id=user.id, email=user.email)
-    verification_base_url = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000")
+    verification_base_url = os.getenv("PUBLIC_API_BASE_URL", "http://192.168.1.23:8000")
     verification_url = f"{verification_base_url}/verify-email?token={verification_token}"
     EmailProviderFactory.create().send_verification_email(
         to_email=user.email,
@@ -231,6 +255,7 @@ def get_me(current_user=Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role,
         "blood_group": current_user.blood_group,
+        "donation_type": current_user.donation_type,
         "available": current_user.available,
         "phone": current_user.phone,
         "phone_verified": current_user.phone_verified,
@@ -241,7 +266,9 @@ def get_me(current_user=Depends(get_current_user)):
 
 
 class UpdateProfile(BaseModel):
+    name: str | None = None
     phone: str | None = None
+    blood_group: str | None = None
     donation_type: str | None = None
     available: bool | None = None
     role: str | None = None
@@ -255,12 +282,21 @@ def update_profile(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if data.name is not None:
+        current_user.name = data.name
+
     if data.phone is not None:
         current_user.phone = data.phone
         current_user.phone_verified = False
 
+    if data.blood_group is not None:
+        current_user.blood_group = data.blood_group
+
     if data.donation_type is not None:
-        normalized = data.donation_type.lower()
+        if current_user.role != "donor":
+            raise HTTPException(status_code=403, detail="Only donors can update donation type")
+
+        normalized = data.donation_type.lower().strip()
         if normalized not in ALLOWED_DONATION_TYPES:
             raise HTTPException(status_code=400, detail="Invalid donation type")
         current_user.donation_type = normalized

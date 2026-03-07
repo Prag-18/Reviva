@@ -11,7 +11,7 @@ class ChatRepository {
     return _service.fetchConversations();
   }
 
-  Future<List<ChatMessageDto>> fetchHistory(String otherUserId) {
-    return _service.fetchHistory(otherUserId);
+  Future<List<ChatMessageDto>> fetchHistory(String receiverId) {
+    return _service.fetchHistory(receiverId);
   }
 }

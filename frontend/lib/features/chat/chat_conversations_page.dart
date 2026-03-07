@@ -32,7 +32,8 @@ class _ChatConversationsPageState extends ConsumerState<ChatConversationsPage> {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.read(chatConversationsControllerProvider.notifier).refresh(),
+          onRefresh: () =>
+              ref.read(chatConversationsControllerProvider.notifier).refresh(),
           child: Builder(
             builder: (_) {
               if (state.loading && state.conversations.isEmpty) {
@@ -50,7 +51,9 @@ class _ChatConversationsPageState extends ConsumerState<ChatConversationsPage> {
                           const SizedBox(height: 10),
                           OutlinedButton(
                             onPressed: () => ref
-                                .read(chatConversationsControllerProvider.notifier)
+                                .read(
+                                  chatConversationsControllerProvider.notifier,
+                                )
                                 .refresh(),
                             child: const Text('Retry'),
                           ),
@@ -82,21 +85,34 @@ class _ChatConversationsPageState extends ConsumerState<ChatConversationsPage> {
                       : convo.lastMessage;
                   final timeLabel = convo.lastMessageAt == null
                       ? ''
-                      : DateFormat('hh:mm a').format(convo.lastMessageAt!.toLocal());
+                      : DateFormat(
+                          'hh:mm a',
+                        ).format(convo.lastMessageAt!.toLocal());
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
                       title: Text(convo.otherUserName),
-                      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (timeLabel.isNotEmpty)
-                            Text(timeLabel, style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                              timeLabel,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
                           const SizedBox(height: 6),
                           if (convo.unread)
-                            const Icon(Icons.circle, size: 10, color: Colors.red),
+                            const Icon(
+                              Icons.circle,
+                              size: 10,
+                              color: Colors.red,
+                            ),
                         ],
                       ),
                       onTap: () {
@@ -105,8 +121,8 @@ class _ChatConversationsPageState extends ConsumerState<ChatConversationsPage> {
                           MaterialPageRoute(
                             builder: (_) => ChatScreen(
                               user: widget.user,
-                              otherUserId: convo.otherUserId,
-                              otherUserName: convo.otherUserName,
+                              receiverId: convo.otherUserId,
+                              receiverName: convo.otherUserName,
                             ),
                           ),
                         );

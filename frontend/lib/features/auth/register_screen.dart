@@ -78,7 +78,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
@@ -113,7 +113,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     try {
-      await ref.read(authRepositoryProvider).register(
+      await ref
+          .read(authRepositoryProvider)
+          .register(
             name: name,
             email: email,
             password: password,
@@ -181,8 +183,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   TextField(
                     controller: _confirmPasswordController,
                     obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'Confirm password'),
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm password',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -200,13 +203,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: _donationType,
-                    decoration:
-                        const InputDecoration(labelText: 'Donation type'),
+                    decoration: const InputDecoration(
+                      labelText: 'Donation type',
+                    ),
                     items: _donationTypes
                         .map(
                           (item) => DropdownMenuItem(
                             value: item,
-                            child: Text(item.replaceAll('_', ' ').toUpperCase()),
+                            child: Text(
+                              item.replaceAll('_', ' ').toUpperCase(),
+                            ),
                           ),
                         )
                         .toList(),
@@ -218,15 +224,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _bloodGroupController,
-                    decoration:
-                        const InputDecoration(labelText: 'Blood group (optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Blood group (optional)',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration:
-                        const InputDecoration(labelText: 'Phone (optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Phone (optional)',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
@@ -238,8 +246,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       _capturingLocation
                           ? 'Capturing location...'
                           : _latitude == null || _longitude == null
-                              ? 'Use Current Location'
-                              : 'Location Captured',
+                          ? 'Use Current Location'
+                          : 'Location Captured',
                     ),
                   ),
                   if (_latitude != null && _longitude != null)
@@ -252,10 +260,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
                   ],
                   const SizedBox(height: 18),
                   ElevatedButton(

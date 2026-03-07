@@ -4,6 +4,7 @@ class UserDto {
   final String email;
   final String role;
   final String? bloodGroup;
+  final String? donationType;
   final bool available;
   final String? phone;
   final bool isVerifiedDonor;
@@ -15,6 +16,7 @@ class UserDto {
     required this.email,
     required this.role,
     this.bloodGroup,
+    this.donationType,
     required this.available,
     this.phone,
     this.isVerifiedDonor = false,
@@ -28,6 +30,7 @@ class UserDto {
       email: json['email']?.toString() ?? '',
       role: json['role']?.toString() ?? '',
       bloodGroup: json['blood_group']?.toString(),
+      donationType: json['donation_type']?.toString(),
       available: json['available'] == true,
       phone: json['phone']?.toString(),
       isVerifiedDonor: json['is_verified_donor'] == true,
@@ -42,6 +45,7 @@ class UserDto {
       'email': email,
       'role': role,
       'blood_group': bloodGroup,
+      'donation_type': donationType,
       'available': available,
       'phone': phone,
       'is_verified_donor': isVerifiedDonor,

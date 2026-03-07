@@ -46,6 +46,9 @@ def _run_startup_migrations() -> None:
         conn.execute(
             text("UPDATE users SET verification_status = 'pending' WHERE verification_status IS NULL")
         )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS idx_users_location ON users USING GIST (location)")
+        )
 
 
 _run_startup_migrations()

@@ -45,7 +45,7 @@ class WebSocketManager with WidgetsBindingObserver {
       await _closeSocket();
 
       final wsUrl =
-          '${AppConfig.baseUrl.replaceFirst('http', 'ws')}/chat/ws/$userId?token=$token';
+          '${ApiConfig.baseUrl.replaceFirst('http', 'ws')}/chat/ws/$userId?token=$token';
       final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _channel = channel;
       _reconnectAttempt = 0;

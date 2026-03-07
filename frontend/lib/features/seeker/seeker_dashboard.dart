@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../chat/chat_screen.dart';
 import '../../models/donor_dto.dart';
 import '../../models/user_dto.dart';
+import '../../screens/map_screen.dart';
 import 'state/find_donors_controller.dart';
 import 'widgets/donor_shimmer_list.dart';
 
@@ -32,7 +34,10 @@ class SeekerDashboard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Find Donors', style: Theme.of(context).textTheme.headlineMedium),
+              Text(
+                'Find Donors',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
               const SizedBox(height: 10),
               Text(
                 'Search nearby available donors instantly',
@@ -49,12 +54,31 @@ class SeekerDashboard extends ConsumerWidget {
                 onChanged: controller.setRadius,
               ),
               const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: state.loading ? null : controller.findDonors,
-                  child: const Text('Search Nearby Donors'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: state.loading ? null : controller.findDonors,
+                      child: const Text('Search Nearby Donors'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MapScreen(
+                            organType: state.organType,
+                            radiusKm: state.radiusKm,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Map'),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               Expanded(
@@ -95,6 +119,18 @@ class SeekerDashboard extends ConsumerWidget {
                                 SnackBar(content: Text(e.toString())),
                               );
                             }
+                          },
+                          onChat: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  user: user,
+                                  receiverId: donor.id,
+                                  receiverName: donor.name,
+                                ),
+                              ),
+                            );
                           },
                         );
                       },
@@ -173,11 +209,13 @@ class _DonorCard extends StatelessWidget {
   final DonorDto donor;
   final String organType;
   final VoidCallback onRequest;
+  final VoidCallback onChat;
 
   const _DonorCard({
     required this.donor,
     required this.organType,
     required this.onRequest,
+    required this.onChat,
   });
 
   @override
@@ -198,13 +236,26 @@ class _DonorCard extends StatelessWidget {
               '${donor.bloodGroup ?? 'N/A'} - ${donor.distanceKm.toStringAsFixed(1)} km away',
             ),
             const SizedBox(height: 4),
-            Text('Donation type: ${(donor.donationType ?? organType).toUpperCase()}'),
+            Text(
+              'Donation type: ${(donor.donationType ?? organType).toUpperCase()}',
+            ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: onRequest,
-                child: const Text('Send Request'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onChat,
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text('Chat'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: onRequest,
+                    child: const Text('Send Request'),
+                  ),
+                ],
               ),
             ),
           ],

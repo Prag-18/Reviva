@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/providers.dart';
 import '../../features/auth/state/auth_controller.dart';
 import '../../features/chat/chat_conversations_page.dart';
 import '../../features/donor/donor_dashboard.dart';
@@ -74,17 +75,18 @@ class _MainShellState extends ConsumerState<MainShell> {
                 }),
                 iconTheme: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return IconThemeData(color: Theme.of(context).colorScheme.primary);
+                    return IconThemeData(
+                      color: Theme.of(context).colorScheme.primary,
+                    );
                   }
                   return IconThemeData(color: navText);
                 }),
               ),
               child: NavigationBar(
                 backgroundColor: Colors.transparent,
-                indicatorColor: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.2),
+                indicatorColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.2),
                 selectedIndex: currentIndex,
                 onDestinationSelected: (index) {
                   setState(() => currentIndex = index);
@@ -120,13 +122,81 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
-class _ProfilePage extends ConsumerWidget {
+class _ProfilePage extends ConsumerStatefulWidget {
   final UserDto user;
 
   const _ProfilePage({required this.user});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<_ProfilePage> {
+  static const _donationTypes = [
+    'blood',
+    'kidney',
+    'liver',
+    'heart',
+    'cornea',
+    'bone_marrow',
+  ];
+
+  late String _selectedDonationType;
+  bool _savingDonationType = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDonationType = widget.user.donationType ?? _donationTypes.first;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfilePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextDonationType = widget.user.donationType ?? _donationTypes.first;
+    if (oldWidget.user.donationType != widget.user.donationType &&
+        !_savingDonationType) {
+      _selectedDonationType = nextDonationType;
+    }
+  }
+
+  Future<void> _saveDonationType() async {
+    final isDonor = widget.user.role == 'donor';
+    if (!isDonor) return;
+    if (_selectedDonationType ==
+        (widget.user.donationType ?? _donationTypes.first)) {
+      return;
+    }
+
+    setState(() => _savingDonationType = true);
+    try {
+      await ref
+          .read(authRepositoryProvider)
+          .updateDonationType(_selectedDonationType);
+      await ref.read(authControllerProvider.notifier).refreshMe();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Donation type updated')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update donation type: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _savingDonationType = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+    final isDonor = user.role == 'donor';
+    final hasDonationTypeChanged =
+        _selectedDonationType != (user.donationType ?? _donationTypes.first);
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -148,15 +218,80 @@ class _ProfilePage extends ConsumerWidget {
                 subtitle: Text(user.role),
               ),
             ),
+            const SizedBox(height: 10),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Donation type',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (isDonor)
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedDonationType,
+                        decoration: const InputDecoration(
+                          labelText: 'Donation Type',
+                        ),
+                        items: _donationTypes
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item,
+                                child: Text(
+                                  item.replaceAll('_', ' ').toUpperCase(),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _savingDonationType
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() => _selectedDonationType = value);
+                              },
+                      )
+                    else
+                      Text(
+                        user.donationType == null
+                            ? 'Not set'
+                            : user.donationType!
+                                  .replaceAll('_', ' ')
+                                  .toUpperCase(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             const Spacer(),
+            if (isDonor)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_savingDonationType || !hasDonationTypeChanged)
+                      ? null
+                      : _saveDonationType,
+                  child: _savingDonationType
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save Profile'),
+                ),
+              ),
+            if (isDonor) const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                onPressed: () =>
+                    ref.read(authControllerProvider.notifier).logout(),
                 icon: const Icon(Icons.logout),
                 label: const Text('Logout'),
               ),
-            )
+            ),
           ],
         ),
       ),

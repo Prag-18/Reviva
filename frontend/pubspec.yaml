@@ -25,7 +25,7 @@ dependencies:
 
   # Location
   geolocator: ^10.1.0
-  google_maps_flutter: ^2.6.0
+  google_maps_flutter: ^2.6.1
 
   # WebSocket
   web_socket_channel: ^2.4.0

@@ -41,6 +41,8 @@ def get_nearby_donors(
         blood_group,
         donation_type,
         available,
+        ST_Y(location::geometry) AS latitude,
+        ST_X(location::geometry) AS longitude,
         ROUND(
             ST_Distance(
                 location,
@@ -58,6 +60,7 @@ def get_nearby_donors(
             :radius
         )
     ORDER BY distance_km ASC
+    LIMIT 50
     """)
 
     result = db.execute(query, {
