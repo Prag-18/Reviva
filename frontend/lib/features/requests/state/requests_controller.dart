@@ -52,7 +52,9 @@ class RequestsController extends StateNotifier<RequestsState> {
   void _initRealtime() {
     _wsSubscription = _ref.read(websocketManagerProvider).stream.listen((event) {
       final type = event['type']?.toString();
-      if (type == 'request_updated' ||
+      if (type == 'new_request' ||
+          type == 'emergency_request' ||
+          type == 'request_updated' ||
           type == 'request_accepted' ||
           type == 'request_rejected') {
         refresh();

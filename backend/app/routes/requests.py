@@ -1,3 +1,5 @@
+from email.mime import text
+from sqlalchemy import text
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 import uuid
@@ -190,6 +192,7 @@ async def reject_request(
 @router.get("/my-requests/{user_id}")
 def get_my_requests(
     user_id: uuid.UUID,
+    status: str | None = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -199,7 +202,7 @@ def get_my_requests(
             detail="Not allowed to view other users' requests",
         )
 
-    requests = (
+    query = (
         db.query(models.DonationRequest)
         .options(
             joinedload(models.DonationRequest.seeker),
@@ -209,24 +212,90 @@ def get_my_requests(
             (models.DonationRequest.donor_id == user_id)
             | (models.DonationRequest.seeker_id == user_id)
         )
-        .order_by(models.DonationRequest.id.desc())
-        .all()
     )
+
+    if status:
+        query = query.filter(models.DonationRequest.status == status)
+
+    requests = query.order_by(
+        models.DonationRequest.urgency.desc(),
+        models.DonationRequest.created_at.desc()
+        ).all()
+
+    priority_map = {
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1
+    }
 
     return [
         {
             "id": request_item.id,
             "urgency": request_item.urgency,
+            "priority": priority_map.get(request_item.urgency, 1),
+            "badge": "🚨 EMERGENCY" if request_item.urgency == "critical" else None,
             "status": request_item.status,
             "organ_type": request_item.organ_type,
+
             "donor_id": request_item.donor_id,
             "seeker_id": request_item.seeker_id,
+
             "seeker_name": request_item.seeker.name if request_item.seeker else None,
             "seeker_blood_group": request_item.seeker.blood_group if request_item.seeker else None,
             "seeker_email": request_item.seeker.email if request_item.seeker else None,
+
             "donor_name": request_item.donor.name if request_item.donor else None,
             "donor_blood_group": request_item.donor.blood_group if request_item.donor else None,
+
             "created_at": request_item.created_at,
         }
         for request_item in requests
     ]
+@router.post("/broadcast-request")
+async def broadcast_request(
+    organ_type: str,
+    urgency: str,
+    latitude: float,
+    longitude: float,
+    radius_km: float = 10,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = text("""
+    SELECT id
+    FROM users
+    WHERE role='donor'
+    AND available = TRUE
+    AND donation_type = :organ_type
+    AND ST_DWithin(
+        location,
+        ST_SetSRID(ST_MakePoint(:lon,:lat),4326)::geography,
+        :radius
+    )
+    LIMIT 20
+    """)
+    donors = db.execute(query, {
+        "lon": longitude,
+        "lat": latitude,
+        "radius": radius_km * 1000,
+        "organ_type": organ_type
+    }).fetchall()
+    for donor in donors:
+        new_request = models.DonationRequest(
+            donor_id=donor.id,
+            seeker_id=current_user.id,
+            organ_type=organ_type,
+            urgency=urgency,
+            status="pending"
+        )
+        db.add(new_request)
+
+    db.commit()
+
+    for donor in donors:
+        await _notify_user(donor.id, "emergency_request")
+    return {
+        "message": "Emergency request broadcasted",
+        "donors_notified": len(donors)
+    }
