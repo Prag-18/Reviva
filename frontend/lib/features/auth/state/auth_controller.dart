@@ -46,8 +46,11 @@ class AuthController extends AsyncNotifier<UserDto?> {
   Future<void> refreshMe() async {
     final current = state.valueOrNull;
     if (current == null) return;
-    state = await AsyncValue.guard(
-      () => ref.read(authServiceProvider).getMe(),
-    );
+    try {
+      final updated = await ref.read(authServiceProvider).getMe();
+      state = AsyncData(updated);
+    } catch (_) {
+      // Ignore transient errors — preserve current user session.
+    }
   }
 }

@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../models/chat_conversation_dto.dart';
 
+// Sentinel used by copyWith to distinguish "do not change error" from "set error to null".
+const Object _kKeepError = Object();
+
 class ChatConversationsState {
   final List<ChatConversationDto> conversations;
   final bool loading;
@@ -25,12 +28,12 @@ class ChatConversationsState {
   ChatConversationsState copyWith({
     List<ChatConversationDto>? conversations,
     bool? loading,
-    String? error,
+    Object? error = _kKeepError,
   }) {
     return ChatConversationsState(
       conversations: conversations ?? this.conversations,
       loading: loading ?? this.loading,
-      error: error,
+      error: identical(error, _kKeepError) ? this.error : error as String?,
     );
   }
 }

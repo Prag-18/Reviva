@@ -7,6 +7,9 @@ import '../../../app/providers.dart';
 import '../../../features/auth/state/auth_controller.dart';
 import '../../../models/chat_message_dto.dart';
 
+// Sentinel used by copyWith to distinguish "do not change error" from "set error to null".
+const Object _kKeepError = Object();
+
 class ChatThreadState {
   final List<ChatMessageDto> messages;
   final bool loading;
@@ -35,14 +38,14 @@ class ChatThreadState {
     bool? loading,
     bool? otherUserTyping,
     String? presence,
-    String? error,
+    Object? error = _kKeepError,
   }) {
     return ChatThreadState(
       messages: messages ?? this.messages,
       loading: loading ?? this.loading,
       otherUserTyping: otherUserTyping ?? this.otherUserTyping,
       presence: presence ?? this.presence,
-      error: error,
+      error: identical(error, _kKeepError) ? this.error : error as String?,
     );
   }
 }

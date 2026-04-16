@@ -1,4 +1,3 @@
-from email.mime import text
 from sqlalchemy import text
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -252,6 +251,8 @@ def get_my_requests(
         }
         for request_item in requests
     ]
+
+
 @router.post("/broadcast-request")
 async def broadcast_request(
     organ_type: str,
@@ -267,6 +268,8 @@ async def broadcast_request(
     FROM users
     WHERE role='donor'
     AND available = TRUE
+    AND is_verified_donor = TRUE
+    AND verification_status = 'approved'
     AND donation_type = :organ_type
     AND ST_DWithin(
         location,

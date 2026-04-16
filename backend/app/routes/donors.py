@@ -20,21 +20,21 @@ def get_nearby_donors(
     latitude: float,
     longitude: float,
     organ_type: str,
-    radius_km: float = 5,   # ✅ FIXED: added radius parameter
+    radius_km: float = 5,
     db: Session = Depends(get_db)
 ):
     organ_type_normalized = organ_type.lower().strip()
 
-    # ✅ Validate organ type
+    # Validate organ type
     if organ_type_normalized not in ALLOWED_ORGAN_TYPES:
         raise HTTPException(status_code=400, detail="Invalid organ type")
 
-    # ✅ Validate radius
+    # Validate radius
     if radius_km <= 0:
         raise HTTPException(status_code=400, detail="Radius must be greater than 0")
 
     query = text("""
-    SELECT 
+    SELECT
         id,
         name,
         role,
@@ -54,6 +54,8 @@ def get_nearby_donors(
     WHERE role = 'donor'
       AND donation_type = :organ_type
       AND available = TRUE
+      AND is_verified_donor = TRUE
+      AND verification_status = 'approved'
       AND ST_DWithin(
             location,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,

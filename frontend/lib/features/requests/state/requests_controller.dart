@@ -6,6 +6,9 @@ import '../../../app/providers.dart';
 import '../../../features/auth/state/auth_controller.dart';
 import '../../../models/donation_request_dto.dart';
 
+// Sentinel used by copyWith to distinguish "do not change error" from "set error to null".
+const Object _kKeepError = Object();
+
 class RequestsState {
   final List<DonationRequestDto> requests;
   final bool loading;
@@ -26,12 +29,12 @@ class RequestsState {
   RequestsState copyWith({
     List<DonationRequestDto>? requests,
     bool? loading,
-    String? error,
+    Object? error = _kKeepError,
   }) {
     return RequestsState(
       requests: requests ?? this.requests,
       loading: loading ?? this.loading,
-      error: error,
+      error: identical(error, _kKeepError) ? this.error : error as String?,
     );
   }
 }

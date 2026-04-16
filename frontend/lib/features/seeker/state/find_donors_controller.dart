@@ -5,6 +5,9 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/utils/location_service.dart';
 import '../../../models/donor_dto.dart';
 
+// Sentinel used by copyWith to distinguish "do not change error" from "set error to null".
+const Object _kKeepError = Object();
+
 class FindDonorsState {
   final List<DonorDto> donors;
   final bool loading;
@@ -31,14 +34,14 @@ class FindDonorsState {
   FindDonorsState copyWith({
     List<DonorDto>? donors,
     bool? loading,
-    String? error,
+    Object? error = _kKeepError,
     String? organType,
     double? radiusKm,
   }) {
     return FindDonorsState(
       donors: donors ?? this.donors,
       loading: loading ?? this.loading,
-      error: error,
+      error: identical(error, _kKeepError) ? this.error : error as String?,
       organType: organType ?? this.organType,
       radiusKm: radiusKm ?? this.radiusKm,
     );
